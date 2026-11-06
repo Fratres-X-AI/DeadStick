@@ -12,8 +12,8 @@ from pymavlink import mavutil
 from deadstick.evaluate.runner import evaluate_rule
 from deadstick.metadata import assert_not_fake_metadata, load_metadata
 from deadstick.param_file import load_param_file
-from deadstick.provenance import build_provenance, sha256_file
-from deadstick.repo import resolve_sitl_defaults_parm
+from deadstick.provenance import build_provenance, provenance_path_str, sha256_file
+from deadstick.repo import REPO_ROOT, resolve_sitl_defaults_parm
 from deadstick.report.json_report import write_result_json
 from deadstick.report.md_report import write_report_md
 from deadstick.rules.loader import load_rule
@@ -125,9 +125,7 @@ def _prelude_for_inject_kind(kind: str) -> list[tuple[str, dict[str, Any]]]:
     return []
 
 
-def _post_inject_for_kind(
-    kind: str, observe_after_inject_s: float
-) -> list[tuple[str, dict[str, Any]]]:
+def _post_inject_for_kind(kind: str, observe_after_inject_s: float) -> list[tuple[str, dict[str, Any]]]:
     k = kind.lower()
     if "rc_loss_while_disarmed" in k:
         return [
@@ -139,9 +137,7 @@ def _post_inject_for_kind(
     ]
 
 
-def _expand_scenario_steps(
-    rule: RuleFile, observe_after_inject_s: float
-) -> list[tuple[str, dict[str, Any]]]:
+def _expand_scenario_steps(rule: RuleFile, observe_after_inject_s: float) -> list[tuple[str, dict[str, Any]]]:
     """Flat sequence: prelude (from inject kind), YAML steps, post-inject observe/arm."""
     out: list[tuple[str, dict[str, Any]]] = []
     for st in rule.scenario:
@@ -294,7 +290,7 @@ def run_rule_on_sitl(
         "file_params_sha256": sha256_file(param_path),
     }
     if defaults_resolved is not None:
-        extra_prov["sitl_defaults_file"] = str(defaults_resolved)
+        extra_prov["sitl_defaults_file"] = provenance_path_str(defaults_resolved, REPO_ROOT)
         extra_prov["sitl_defaults_sha256"] = sha256_file(defaults_resolved)
     prov = build_provenance(
         param_path=param_path,
@@ -302,6 +298,7 @@ def run_rule_on_sitl(
         simulator_speedup=speedup,
         random_seed=seed,
         extra=extra_prov,
+        relative_to=REPO_ROOT,
     )
     write_result_json(
         run_dir / "result.json",
@@ -379,15 +376,10 @@ def _probe_armable_before_r01_fault(mav: mavutil.mavlink_connection) -> None:
         else:
             time.sleep(0.05)
     snippet = " | ".join(lines[-12:]) if lines else "no STATUSTEXT"
-    raise RuntimeError(
-        "vehicle not armable before fault; cannot test r01. "
-        f"Recorded statustext: {snippet}"
-    )
+    raise RuntimeError(f"vehicle not armable before fault; cannot test r01. Recorded statustext: {snippet}")
 
 
-def append_param_digest_events(
-    missing: list[str], rejected: list[str], t_ms: float
-) -> list[TimelineEvent]:
+def append_param_digest_events(missing: list[str], rejected: list[str], t_ms: float) -> list[TimelineEvent]:
     return [
         TimelineEvent(
             t_boot_ms=t_ms,
@@ -559,9 +551,7 @@ def _exec_step(
             0,
         )
         poll_mavlink_to_timeline(mav, out_path=timeline_path, duration_s=2.0, append=True)
-        for res in drain_ack_results(
-            mav, mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, timeout_s=1.0
-        ):
+        for res in drain_ack_results(mav, mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM, timeout_s=1.0):
             append_events(
                 timeline_path,
                 [

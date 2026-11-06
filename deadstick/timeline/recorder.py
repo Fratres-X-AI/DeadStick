@@ -52,9 +52,7 @@ def record_mavlink_to_jsonl(
                 current_mode = _mode_name(mav, m)
                 if current_mode != last_mode:
                     last_mode = current_mode
-                    ev = TimelineEvent(
-                        t_boot_ms=t_ms, type="mode", payload={"name": current_mode}
-                    )
+                    ev = TimelineEvent(t_boot_ms=t_ms, type="mode", payload={"name": current_mode})
                     events.append(ev)
                     f.write(
                         json.dumps(
@@ -72,10 +70,7 @@ def record_mavlink_to_jsonl(
                     text = text.decode("utf-8", errors="replace")
                 ev = TimelineEvent(t_boot_ms=t_ms, type="statustext", payload={"text": text})
                 events.append(ev)
-                f.write(
-                    json.dumps({"t_boot_ms": t_ms, "type": "statustext", "payload": {"text": text}})
-                    + "\n"
-                )
+                f.write(json.dumps({"t_boot_ms": t_ms, "type": "statustext", "payload": {"text": text}}) + "\n")
             elif name == "GLOBAL_POSITION_INT":
                 rel_m = getattr(m, "relative_alt", None)
                 if rel_m is not None:

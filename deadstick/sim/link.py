@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
 
 from pymavlink import mavutil
 
@@ -142,8 +141,7 @@ def append_param_timeline_events(
     t_ms: float,
 ) -> list[TimelineEvent]:
     return [
-        TimelineEvent(t_boot_ms=t_ms, type="param", payload={"name": k, "value": v})
-        for k, v in sorted(params.items())
+        TimelineEvent(t_boot_ms=t_ms, type="param", payload={"name": k, "value": v}) for k, v in sorted(params.items())
     ]
 
 

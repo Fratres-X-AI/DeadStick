@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
 
 from deadstick.timeline.model import Timeline, TimelineEvent
 
@@ -132,12 +131,7 @@ def bin_to_timeline(path: Path, *, params: dict[str, float] | None = None) -> Ti
                         payload={"kind": "rc_loss", "source": "PARM_SIM_RC_FAIL"},
                     )
                 )
-            elif (
-                pname == "SIM_BATT_VOLTAGE"
-                and batt_low_v is not None
-                and val > 0.0
-                and val < batt_low_v
-            ):
+            elif pname == "SIM_BATT_VOLTAGE" and batt_low_v is not None and val > 0.0 and val < batt_low_v:
                 events.append(
                     TimelineEvent(
                         t_boot_ms=t_ms,

@@ -6,12 +6,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from deadstick.rules.schema import RuleFile
-from deadstick.timeline.model import TimelineEvent
-from deadstick.timeline.recorder import append_events, record_mavlink_to_jsonl
 from deadstick.repo import resolve_sitl_defaults_parm
+from deadstick.rules.schema import RuleFile
 from deadstick.sim.faults import FaultInjector
 from deadstick.sim.link import apply_param_file, connect_with_retry
+from deadstick.timeline.model import TimelineEvent
+from deadstick.timeline.recorder import append_events, record_mavlink_to_jsonl
 
 
 @dataclass
@@ -105,9 +105,7 @@ def run_rule_scenario_stub(
                     )
                 ],
             )
-        record_mavlink_to_jsonl(
-            mav, out_path=timeline_path, duration_s=observe_s, append=timeline_path.exists()
-        )
+        record_mavlink_to_jsonl(mav, out_path=timeline_path, duration_s=observe_s, append=timeline_path.exists())
         return ScenarioResult(
             timeline_path=timeline_path,
             dataflash_path=None,

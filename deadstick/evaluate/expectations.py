@@ -107,9 +107,7 @@ def apply_precondition(
     return Result(rule_id=rule_id, verdict=Verdict.CANNOT_JUDGE, reason=msg)
 
 
-def fs_thr_disabled_gate(
-    *, rule_id: str, kind: RuleKind, params: dict[str, float]
-) -> Result | None:
+def fs_thr_disabled_gate(*, rule_id: str, kind: RuleKind, params: dict[str, float]) -> Result | None:
     if "FS_THR_ENABLE" not in params:
         return None
     if float(params["FS_THR_ENABLE"]) != 0.0:

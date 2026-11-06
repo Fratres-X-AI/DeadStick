@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 from deadstick.timeline.dataflash import acm_mode_num_to_name, timeus_to_ms
 
 

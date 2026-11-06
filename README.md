@@ -3,6 +3,9 @@
 DeadStick runs **scripted faults** against **ArduPilot SITL**, records a **flight log**, and **judges** the result against **YAML rules** and your **parameter file**. Simulated, logged, judged — never “proven safe.”
 
 [![CI](https://github.com/Fratres-X-AI/DeadStick/actions/workflows/ci.yml/badge.svg)](https://github.com/Fratres-X-AI/DeadStick/actions/workflows/ci.yml)
+[![Python 3.10–3.12](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue)](https://github.com/Fratres-X-AI/DeadStick/blob/main/pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/Fratres-X-AI/DeadStick/blob/main/LICENSE)
+[![Coverage](https://img.shields.io/badge/coverage-see%20CI%20logs-informational)](https://github.com/Fratres-X-AI/DeadStick/actions/workflows/ci.yml)
 
 ## Status
 
@@ -51,6 +54,8 @@ Use a **Linux x86-64** machine (physical or virtual) with enough CPU and disk to
 
 A **`FAIL`** means the fault was **injected**, **confirmed** in the log (for example STATUSTEXT within `confirm_fault.within_s` after the inject time), and an **expectation check** then found forbidden or missing behavior (wrong mode, altitude, arming when it should be refused, etc.).
 
+Example report and `result.json` from unit-test-shaped fixtures (not a live flight): [docs/examples/r01_unit_fixture_report.md](docs/examples/r01_unit_fixture_report.md) and [docs/examples/r01_unit_fixture_result.json](docs/examples/r01_unit_fixture_result.json).
+
 Example (abbreviated):
 
 - **Rule**: requirement — on RC loss, enter the configured failsafe mode within the time bound.
@@ -66,6 +71,19 @@ Example (abbreviated):
 | **r03** | Battery low action set to land → battery-low inject must lead to LAND (requirement). |
 
 Files: `rules/copter/r01_*.yaml`, `r02_*.yaml`, `r03_*.yaml`.
+
+## CLI exit codes
+
+The CLI prints a short message on failure and does not dump Python tracebacks for expected input errors.
+
+| Code | Meaning |
+|------|---------|
+| **0** | Success. Worst verdict was **PASS** or **CANNOT_JUDGE**. |
+| **1** | Worst verdict was **FAIL** or **ERROR**, or another command failure. |
+| **2** | Refused to use fake or placeholder metadata (see `assert_not_fake_metadata`). |
+| **64** | *(Reserved)* usage and Typer errors are not mapped separately yet. |
+
+A one-to-one mapping from exit code to verdict (**1** = FAIL, **2** = CANNOT_JUDGE, **3** = ERROR) is not implemented yet; changing that would be a breaking CLI change.
 
 ## Safety notice
 

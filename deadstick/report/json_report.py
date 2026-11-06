@@ -4,7 +4,15 @@ import json
 from pathlib import Path
 from typing import Any
 
+from deadstick.repo import REPO_ROOT
 from deadstick.verdict import Result
+
+
+def _repo_relative_str(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(REPO_ROOT).as_posix()
+    except ValueError:
+        return str(path.resolve())
 
 
 def write_result_json(
@@ -30,8 +38,8 @@ def write_result_json(
         "provenance": provenance,
     }
     if timeline_path is not None:
-        payload["timeline_path"] = str(timeline_path)
+        payload["timeline_path"] = _repo_relative_str(timeline_path)
     if dataflash_path is not None:
-        payload["dataflash_path"] = str(dataflash_path)
+        payload["dataflash_path"] = _repo_relative_str(dataflash_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")

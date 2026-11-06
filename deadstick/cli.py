@@ -13,6 +13,7 @@ from deadstick.evaluate.runner import evaluate_rule
 from deadstick.metadata import load_metadata
 from deadstick.param_file import load_param_file
 from deadstick.provenance import build_provenance
+from deadstick.repo import REPO_ROOT
 from deadstick.report.json_report import write_result_json
 from deadstick.report.md_report import write_report_md
 from deadstick.rules.loader import load_rule
@@ -20,7 +21,10 @@ from deadstick.timeline.dataflash import bin_to_timeline
 from deadstick.timeline.jsonl import load_jsonl
 from deadstick.verdict import Result, Verdict
 
-app = typer.Typer(help="DeadStick — autopilot safety bench (SITL-first).")
+app = typer.Typer(
+    help="DeadStick — autopilot safety bench (SITL-first).",
+    pretty_exceptions_enable=False,
+)
 console = Console()
 
 
@@ -35,7 +39,10 @@ def _aggregate_worst(rows: list[Result]) -> Verdict:
 
 @app.command("explain")
 def explain(rule: Path) -> None:
-    """Print a human-readable summary of a rule YAML (no simulator)."""
+    """Print a human-readable summary of a rule YAML (no simulator).
+
+    Example: deadstick explain rules/copter/r01_rc_loss_disarmed_blocks_arming.yaml
+    """
     rf = load_rule(rule)
     console.print(f"[bold]{rf.id}[/bold] — {rf.say}")
     console.print(f"kind: {rf.kind.value}  vehicle: {rf.vehicle}")
@@ -67,7 +74,7 @@ def run_cmd(
         None,
         "--dataflash",
         "-b",
-        help="Optional dataflash .BIN (verdict uses this timeline when set; plan §0).",
+        help="Optional dataflash .BIN (verdict uses this timeline when set).",
     ),
     out_dir: Optional[Path] = typer.Option(
         None,
@@ -79,8 +86,11 @@ def run_cmd(
     seed: Optional[int] = typer.Option(None, "--seed", help="Random seed for provenance."),
 ) -> None:
     """
-    Evaluate one rule. If --dataflash is set, the verdict is computed from the .BIN
-    timeline (vehicle record); otherwise from the JSONL timeline.
+    Evaluate one rule offline from a log. If --dataflash is set, the verdict uses the
+    .BIN timeline; otherwise JSONL (or a single .bin path as --log).
+
+    Example: deadstick run -r rules/copter/r01_….yaml -p tests/fixtures/params/default.param \\
+      -m metadata/Copter-4.7.2.json -l path/to/timeline.jsonl
     """
     from deadstick.metadata import assert_not_fake_metadata
 
@@ -100,13 +110,10 @@ def run_cmd(
     timeline_jsonl = load_jsonl(log) if log.suffix.lower() == ".jsonl" else None
     if dataflash is not None:
         timeline = bin_to_timeline(dataflash, params=param_map)
-        primary_log = dataflash
     elif timeline_jsonl is not None:
         timeline = timeline_jsonl
-        primary_log = log
     else:
         timeline = bin_to_timeline(log, params=param_map)
-        primary_log = log
 
     prov = build_provenance(
         param_path=params,
@@ -114,6 +121,7 @@ def run_cmd(
         simulator_speedup=speedup,
         random_seed=seed,
         extra={"run_id": run_id, "rule_id": rf.id},
+        relative_to=REPO_ROOT,
     )
     raw = evaluate_rule(rule=rf, params=param_map, metadata=meta, timeline=timeline)
     rows = [replace(r, provenance={**r.provenance, **prov}) for r in raw]
@@ -161,7 +169,7 @@ def sitl_run(
     arducopter: Path = typer.Option(
         ...,
         "--arducopter",
-        help="Path to arducopter SITL binary (after ./waf copter on the pod).",
+        help="Path to arducopter SITL binary (after ./waf copter in the ArduPilot tree).",
     ),
     results_dir: Path = typer.Option(
         Path("results"),
@@ -184,7 +192,11 @@ def sitl_run(
     ),
     seed: Optional[int] = typer.Option(None, "--seed"),
 ) -> None:
-    """Run one rule against live SITL on this machine (Linux x86-64)."""
+    """Run one rule against live SITL on this machine (Linux x86-64).
+
+    Example: deadstick sitl-run -r rules/copter/r01_….yaml -p tests/fixtures/params/default.param \\
+      -m metadata/Copter-4.7.2.json --arducopter path/to/build/sitl/bin/arducopter
+    """
     from deadstick.metadata import assert_not_fake_metadata
     from deadstick.sim.scenario_engine import run_rule_on_sitl
 
@@ -236,7 +248,11 @@ def run_all(
     dataflash: Optional[Path] = typer.Option(None, "--dataflash", "-b"),
     out_dir: Optional[Path] = typer.Option(None, "--out-dir", "-o"),
 ) -> None:
-    """Run every rule YAML in a directory sequentially (one verdict set per rule)."""
+    """Run every rule YAML in a directory sequentially (one verdict set per rule).
+
+    Example: deadstick run-all --rules-dir rules/copter -p tests/fixtures/params/default.param \\
+      -m metadata/Copter-4.7.2.json -l path/to/timeline.jsonl
+    """
     run_id = str(uuid.uuid4())[:8]
     base = out_dir or (Path("results") / f"batch_{run_id}")
     base.mkdir(parents=True, exist_ok=True)
@@ -255,7 +271,7 @@ def run_all(
             timeline = load_jsonl(log)
         else:
             timeline = bin_to_timeline(log, params=param_map)
-        prov = build_provenance(param_path=params, rule_path=rule_path, extra={"batch": run_id})
+        prov = build_provenance(param_path=params, rule_path=rule_path, extra={"batch": run_id}, relative_to=REPO_ROOT)
         rows = evaluate_rule(rule=rf, params=param_map, metadata=meta, timeline=timeline)
         w = _aggregate_worst(rows)
         if order.index(w) > order.index(worst_overall):
@@ -275,7 +291,10 @@ def run_all(
 
 @app.command("report")
 def report_cmd(result_json: Path) -> None:
-    """Print a short summary from a result.json written by `deadstick run`."""
+    """Print a short summary from a result.json written by deadstick run.
+
+    Example: deadstick report results/run_abcdef12/result.json
+    """
     import json
 
     data = json.loads(result_json.read_text(encoding="utf-8"))

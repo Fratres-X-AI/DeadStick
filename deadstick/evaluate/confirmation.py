@@ -58,7 +58,7 @@ def evaluate_fault_gate(
 ) -> Result | None:
     """
     If no spec, no gate. If fault time unknown, CANNOT_JUDGE.
-    If not confirmed in window, CANNOT_JUDGE per plan §0 rule 10.
+    If not confirmed in window, CANNOT_JUDGE (expectation checks are skipped).
     """
     if spec is None:
         return None
@@ -77,10 +77,7 @@ def evaluate_fault_gate(
     return Result(
         rule_id=rule_id,
         verdict=Verdict.CANNOT_JUDGE,
-        reason=(
-            "Fault not confirmed by vehicle within "
-            f"{spec.within_s}s after inject (no matching STATUSTEXT)."
-        ),
+        reason=(f"Fault not confirmed by vehicle within {spec.within_s}s after inject (no matching STATUSTEXT)."),
         evidence=ev,
     )
 

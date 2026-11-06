@@ -7,7 +7,6 @@ from deadstick.param_file import load_param_file
 from deadstick.rules.loader import load_rule
 from deadstick.timeline.jsonl import load_jsonl
 from deadstick.verdict import Verdict
-
 from tests.helpers.metadata_samples import MIN_COPTER_METADATA
 
 FIX = Path("tests/fixtures/params/bad")

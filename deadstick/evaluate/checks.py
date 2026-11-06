@@ -27,7 +27,9 @@ def _resolve_within_s(payload: dict[str, Any], params: dict[str, float]) -> floa
     raise TypeError("Expected within_s or within_s_expr in payload")
 
 
-def _resolve_modes(payload: dict[str, Any], metadata: dict, params: dict[str, float]) -> tuple[list[str] | None, str | None]:
+def _resolve_modes(
+    payload: dict[str, Any], metadata: dict, params: dict[str, float]
+) -> tuple[list[str] | None, str | None]:
     if "modes" in payload:
         raw = payload["modes"]
         if not isinstance(raw, list):

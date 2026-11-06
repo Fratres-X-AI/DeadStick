@@ -3,6 +3,7 @@
 Parallel matrix: rules x param files x repeats (Linux host).
 Requires SITL binaries and metadata; v1 is a skeleton that lists work items.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -43,10 +44,7 @@ def main() -> None:
     workers = args.workers if args.workers is not None else max(1, cpus - 2)
 
     rules = sorted(args.rules_dir.glob("*.yaml"))
-    print(
-        f"Matrix skeleton: {len(rules)} rules, repeats={args.repeats}, "
-        f"effective_cpus={cpus} workers={workers}"
-    )
+    print(f"Matrix skeleton: {len(rules)} rules, repeats={args.repeats}, effective_cpus={cpus} workers={workers}")
     print("Full parallel SITL execution is wired in phase 5 after Docker + harness hardening.")
 
 
