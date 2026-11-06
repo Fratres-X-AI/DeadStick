@@ -2,7 +2,7 @@
 
 ## Where things stand
 
-- Branch: phase3-fixes @ 1522d46
+- Branch: phase3-fixes @ 136414e
 - ArduCopter pinned: Copter-4.7.2 @ fb773567896014da007bca58358704d4a0d8516f (ardupilot.lock and metadata are committed)
 - Unit tests on the laptop at that hash: 46 passed, 1 skipped
 - Step list: DEADSTICK_STEPS.md. Part A is done (A1–A14). Part B is stuck at B7.
