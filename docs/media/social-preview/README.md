@@ -1,6 +1,6 @@
-# Social preview image
+# Hero and social preview image
 
-This folder holds the **recommended** Open Graph / repository card image (`repo-social-preview.jpg`).
+This folder holds the **banner** used at the top of [README.md](../../README.md) and the **recommended** Open Graph / repository card (`repo-social-preview.jpg` — same file).
 
 GitHub does not offer a public API to set the social preview. To use it on the repository:
 

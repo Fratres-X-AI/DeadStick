@@ -1,5 +1,9 @@
 # DeadStick — what your drone does when something dies
 
+<p align="center">
+  <img src="docs/media/social-preview/repo-social-preview.jpg" alt="DeadStick — autopilot failsafe bench. Simulated. Logged. Judged." width="100%" />
+</p>
+
 DeadStick runs **scripted faults** against **ArduPilot SITL**, records a **flight log**, and **judges** the result against **YAML rules** and your **parameter file**. Simulated, logged, judged — never “proven safe.”
 
 [![CI](https://github.com/Fratres-X-AI/DeadStick/actions/workflows/ci.yml/badge.svg)](https://github.com/Fratres-X-AI/DeadStick/actions/workflows/ci.yml)
