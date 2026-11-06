@@ -2,9 +2,10 @@
 
 ## Where things stand
 
-- Branch: phase3-fixes @ 136414e
+- Branch: phase3-fixes (see `git log` for any small documentation-only commits after the pause export)
+- Session documentation export in git: 6c71a82 (contains `docs/sessions/2026-11-06/` and this file)
 - ArduCopter pinned: Copter-4.7.2 @ fb773567896014da007bca58358704d4a0d8516f (ardupilot.lock and metadata are committed)
-- Unit tests on the laptop at that hash: 46 passed, 1 skipped
+- Unit tests on the laptop before pausing: 46 passed, 1 skipped
 - Step list: DEADSTICK_STEPS.md. Part A is done (A1–A14). Part B is stuck at B7.
 - Full pod archive (run logs, flight logs, built simulator): C:\Users\elxsh\Projects\deadstick-pod-archive\2026-11-06\
 
