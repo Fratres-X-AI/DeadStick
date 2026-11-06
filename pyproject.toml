@@ -5,10 +5,22 @@ build-backend = "hatchling.build"
 [project]
 name = "deadstick"
 version = "0.1.0"
-description = "Autopilot safety bench — operator rules against SITL logs"
+description = "Autopilot safety bench: operator rules checked against simulated failsafe behavior"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
+authors = [{ name = "Fratres X AI" }]
+keywords = ["ardupilot", "drone", "failsafe", "sitl", "safety", "testing"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering",
+]
 dependencies = [
   "pymavlink>=2.4.40",
   "pyyaml>=6.0",
@@ -17,19 +29,45 @@ dependencies = [
   "rich>=13.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Fratres-X-AI/DeadStick"
+Repository = "https://github.com/Fratres-X-AI/DeadStick"
+Issues = "https://github.com/Fratres-X-AI/DeadStick/issues"
+Changelog = "https://github.com/Fratres-X-AI/DeadStick/blob/main/CHANGELOG.md"
+
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=4.0",
+  "ruff>=0.8.0",
+  "mypy>=1.13.0",
+  "empy==3.3.4",
+  "pexpect",
+]
 
 [project.scripts]
 deadstick = "deadstick.cli:app"
-apbench = "deadstick.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["deadstick"]
 
 [tool.pytest.ini_options]
 markers = [
-  "needs_pod_log: needs a real ArduPilot .BIN fixture from the pod",
+  "needs_sitl_log: needs a real ArduPilot .BIN log from a SITL run",
 ]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+packages = ["deadstick"]
+ignore_missing_imports = true
+check_untyped_defs = true

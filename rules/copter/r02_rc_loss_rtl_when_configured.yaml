@@ -7,19 +7,19 @@ vehicle: copter
 requires_params:
   - FS_THR_ENABLE
   - FS_OPTIONS
+  - RC_FS_TIMEOUT
 precondition:
   expr: FS_THR_ENABLE != 0
-  reason_if_not: Radio failsafe disabled — cannot judge RC-loss behavior.
+  reason_if_not: >-
+    Radio failsafe disabled (FS_THR_ENABLE = 0). RTL-on-loss requirement does not apply.
 scenario:
   - inject_fault:
       kind: rc_loss_in_air
-      at_ms: 2000
 confirm_fault:
   any_of:
     - statustext: "(?i)radio.*failsafe|rc.*failsafe"
   within_s: 5
 expect:
   - check: expect_mode_within
-    anchor_ms: 2000
-    within_s: 30
+    within_s_expr: "RC_FS_TIMEOUT + 1.0"
     modes_from: expectations.rc_loss_action

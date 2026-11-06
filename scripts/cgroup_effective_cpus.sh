@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Print integer CPU quota for this cgroup (v2 cpu.max or v1 cfs quota), else nproc.
-# RunPod/cgroups may report fewer CPUs than the host's nproc — use this for -j / workers.
+# cgroup-limited containers may report fewer CPUs than the host's nproc — use this for -j / workers.
 set -euo pipefail
 
 ceiling_div() {

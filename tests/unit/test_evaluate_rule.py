@@ -8,7 +8,6 @@ from deadstick.param_file import load_param_file
 from deadstick.rules.loader import load_rule
 from deadstick.timeline.jsonl import load_jsonl
 from deadstick.verdict import Verdict
-
 from tests.helpers.metadata_samples import MIN_COPTER_METADATA
 
 
@@ -23,9 +22,7 @@ def _write_jsonl(path: Path, lines: list[str]) -> Path:
 
 
 def _fault(t: float, kind: str = "rc_loss") -> str:
-    return json.dumps(
-        {"t_boot_ms": t, "type": "fault_injected", "payload": {"kind": kind}}
-    )
+    return json.dumps({"t_boot_ms": t, "type": "fault_injected", "payload": {"kind": kind}})
 
 
 def _radio_confirm(t: float) -> str:
@@ -40,9 +37,7 @@ def _radio_confirm(t: float) -> str:
 
 def test_r02_pass_rc_loss_rtl(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
-    params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
-    )
+    params = load_param_file(_write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n"))
     tl = load_jsonl(
         _write_jsonl(
             tmp_path / "t.jsonl",
@@ -62,9 +57,7 @@ def test_r02_pass_rc_loss_rtl(tmp_path: Path, repo_root: Path) -> None:
 
 def test_r02_fail_no_rtl(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
-    params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
-    )
+    params = load_param_file(_write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n"))
     tl = load_jsonl(
         _write_jsonl(
             tmp_path / "t.jsonl",
@@ -81,9 +74,7 @@ def test_r02_fail_no_rtl(tmp_path: Path, repo_root: Path) -> None:
 
 def test_r02_fail_too_slow_mode(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
-    params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
-    )
+    params = load_param_file(_write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n"))
     tl = load_jsonl(
         _write_jsonl(
             tmp_path / "t.jsonl",
@@ -101,9 +92,7 @@ def test_r02_fail_too_slow_mode(tmp_path: Path, repo_root: Path) -> None:
 
 def test_r02_unconfirmed_fault(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
-    params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
-    )
+    params = load_param_file(_write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n"))
     tl = load_jsonl(
         _write_jsonl(
             tmp_path / "t.jsonl",
@@ -121,9 +110,7 @@ def test_r02_unconfirmed_fault(tmp_path: Path, repo_root: Path) -> None:
 
 def test_r02_missing_fault_event(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
-    params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
-    )
+    params = load_param_file(_write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n"))
     tl = load_jsonl(
         _write_jsonl(
             tmp_path / "t.jsonl",
@@ -139,9 +126,7 @@ def test_r02_missing_fault_event(tmp_path: Path, repo_root: Path) -> None:
 
 def test_r02_precondition_fs_off(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
-    params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,0\nFS_OPTIONS,0\n")
-    )
+    params = load_param_file(_write_param(tmp_path / "p.param", "FS_THR_ENABLE,0\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n"))
     tl = load_jsonl(
         _write_jsonl(
             tmp_path / "t.jsonl",
@@ -161,16 +146,14 @@ def test_r02_precondition_fs_off(tmp_path: Path, repo_root: Path) -> None:
 
 def test_r01_pass_arming_refused(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r01_rc_loss_disarmed_blocks_arming.yaml")
-    params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
-    )
+    params = load_param_file(_write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n"))
     tl = load_jsonl(
         _write_jsonl(
             tmp_path / "t.jsonl",
             [
                 _fault(800.0, "rc_loss_while_disarmed"),
-                _radio_confirm(810.0),
-                '{"t_boot_ms": 920, "type": "statustext", "payload": {"text": "PreArm: Radio failsafe active"}}',
+                '{"t_boot_ms": 810, "type": "statustext", "payload": {"text": "PreArm: Radio failsafe on"}}',
+                '{"t_boot_ms": 920, "type": "statustext", "payload": {"text": "PreArm: Radio failsafe on"}}',
             ],
         )
     )
@@ -178,9 +161,25 @@ def test_r01_pass_arming_refused(tmp_path: Path, repo_root: Path) -> None:
     assert results[0].verdict is Verdict.PASS
 
 
+def test_r01_not_pass_for_position_estimate_only(tmp_path: Path, repo_root: Path) -> None:
+    rule = load_rule(repo_root / "rules" / "copter" / "r01_rc_loss_disarmed_blocks_arming.yaml")
+    params = load_param_file(_write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n"))
+    tl = load_jsonl(
+        _write_jsonl(
+            tmp_path / "t.jsonl",
+            [
+                _fault(800.0, "rc_loss_while_disarmed"),
+                '{"t_boot_ms": 920, "type": "statustext", "payload": {"text": "PreArm: Need Position Estimate"}}',
+            ],
+        )
+    )
+    results = evaluate_rule(rule=rule, params=params, metadata=dict(MIN_COPTER_METADATA), timeline=tl)
+    assert results[0].verdict is not Verdict.PASS
+
+
 def test_r03_battery_land(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r03_battery_low_triggers_land.yaml")
-    params = load_param_file(_write_param(tmp_path / "p.param", "BATT_FS_LOW_ACT,1\n"))
+    params = load_param_file(_write_param(tmp_path / "p.param", "BATT_FS_LOW_ACT,1\nBATT_LOW_TIMER,2\n"))
     tl = load_jsonl(
         _write_jsonl(
             tmp_path / "t.jsonl",

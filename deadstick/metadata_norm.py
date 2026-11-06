@@ -1,4 +1,5 @@
 """Normalize ArduPilot apm.pdef.json into DeadStick metadata shape."""
+
 from __future__ import annotations
 
 from typing import Any

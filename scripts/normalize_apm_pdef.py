@@ -3,6 +3,7 @@
 Flatten ArduPilot apm.pdef.json (from param_parse.py --format=json) into DeadStick shape:
   {"parameters": { "NAME": { "values": {...}, "bitmask": {...} } } }
 """
+
 from __future__ import annotations
 
 import argparse

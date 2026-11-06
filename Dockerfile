@@ -1,4 +1,4 @@
-# CPU-only image for RunPod / Linux hosts. Build ArduPilot SITL with scripts/build_sitl.sh separately.
+# CPU-only image for Linux hosts. Build ArduPilot SITL with scripts/build_sitl.sh separately.
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive

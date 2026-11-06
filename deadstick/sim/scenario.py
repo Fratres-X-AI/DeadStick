@@ -1,17 +1,17 @@
 from __future__ import annotations
 
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from pymavlink import mavutil
-
+from deadstick.repo import resolve_sitl_defaults_parm
 from deadstick.rules.schema import RuleFile
+from deadstick.sim.faults import FaultInjector
+from deadstick.sim.link import apply_param_file, connect_with_retry
 from deadstick.timeline.model import TimelineEvent
 from deadstick.timeline.recorder import append_events, record_mavlink_to_jsonl
-from deadstick.sim.faults import FaultInjector
-from deadstick.sim.link import apply_param_file, connect, fetch_all_params, wait_heartbeat
 
 
 @dataclass
@@ -44,28 +44,31 @@ def run_rule_scenario_stub(
 ) -> ScenarioResult:
     """
     Minimal harness: start SITL, connect, apply params, inject fault from rule,
-    record MAVLink JSONL. Full flight script (takeoff/GUIDED) is phase-3 extended.
+    record MAVLink JSONL. Longer takeoff and air scenarios can be added later.
     """
     from deadstick.sim.sitl import SitlProcess
 
-    run_id = f"{rule.id}_stub"
+    run_id = f"{rule.id}_{int(time.time())}_{uuid.uuid4().hex[:8]}"
     sitl_dir = results_dir / run_id / "sitl"
     timeline_path = results_dir / run_id / "timeline.jsonl"
     sitl_dir.mkdir(parents=True, exist_ok=True)
     if timeline_path.exists():
         timeline_path.unlink()
 
+    tcp_port = 5760
+    defaults_path = resolve_sitl_defaults_parm(defaults_parm)
     sitl = SitlProcess(
         arducopter_bin=arducopter_bin,
         workdir=sitl_dir,
         speedup=speedup,
-        defaults_parm=defaults_parm,
+        tcp_port=tcp_port,
+        instance=0,
+        defaults_parm=defaults_path,
     )
     inj = _find_inject_step(rule)
     try:
         sitl.start()
-        mav = connect()
-        wait_heartbeat(mav)
+        mav = connect_with_retry(f"tcp:127.0.0.1:{tcp_port}")
         reported, missing, rejected = apply_param_file(mav, param_path)
         fi = FaultInjector(mav)
         fi.refresh_param_names(reported)
@@ -102,9 +105,7 @@ def run_rule_scenario_stub(
                     )
                 ],
             )
-        record_mavlink_to_jsonl(
-            mav, out_path=timeline_path, duration_s=observe_s, append=timeline_path.exists()
-        )
+        record_mavlink_to_jsonl(mav, out_path=timeline_path, duration_s=observe_s, append=timeline_path.exists())
         return ScenarioResult(
             timeline_path=timeline_path,
             dataflash_path=None,

@@ -1,23 +1,19 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from deadstick.rules.schema import ConfirmFault, ConfirmFaultAnyOf
+
+if TYPE_CHECKING:
+    from deadstick.rules.schema import RuleFile
+
 from deadstick.timeline.model import Timeline, TimelineEvent
 from deadstick.verdict import Result, Verdict
 
+
 def _match_statustext(pat: str, text: str) -> bool:
     return re.search(pat, text, re.IGNORECASE) is not None
-
-
-def _err_matches(entry: dict[str, Any], want: dict[str, Any]) -> bool:
-    for k, v in want.items():
-        if k not in entry:
-            return False
-        if entry.get(k) != v:
-            return False
-    return True
 
 
 def _any_predicate(
@@ -29,18 +25,6 @@ def _any_predicate(
             if e.type != "statustext":
                 continue
             if _match_statustext(pred.statustext, str(e.payload.get("text", ""))):
-                return True
-    if pred.log_err is not None:
-        want = dict(pred.log_err)
-        for e in events:
-            if e.type != "err":
-                continue
-            pl = e.payload
-            entry: dict[str, Any] = {
-                "subsys": pl.get("subsys"),
-                "ecode": pl.get("ecode"),
-            }
-            if _err_matches(want, entry):
                 return True
     return False
 
@@ -74,7 +58,7 @@ def evaluate_fault_gate(
 ) -> Result | None:
     """
     If no spec, no gate. If fault time unknown, CANNOT_JUDGE.
-    If not confirmed in window, CANNOT_JUDGE per plan §0 rule 10.
+    If not confirmed in window, CANNOT_JUDGE (expectation checks are skipped).
     """
     if spec is None:
         return None
@@ -82,7 +66,10 @@ def evaluate_fault_gate(
         return Result(
             rule_id=rule_id,
             verdict=Verdict.CANNOT_JUDGE,
-            reason="Fault confirmation required but no fault_injected event in timeline.",
+            reason=(
+                "Fault confirmation required but fault inject time is unknown "
+                "(no fault_injected in timeline; for .BIN use PARM SIM_RC_FAIL / SIM_BATT_VOLTAGE)."
+            ),
         )
     ok, ev = fault_confirmed(timeline=timeline, spec=spec, fault_t_ms=fault_t_ms)
     if ok:
@@ -90,14 +77,38 @@ def evaluate_fault_gate(
     return Result(
         rule_id=rule_id,
         verdict=Verdict.CANNOT_JUDGE,
-        reason=(
-            "Fault not confirmed by vehicle within "
-            f"{spec.within_s}s after inject (no matching ERR/STATUSTEXT)."
-        ),
+        reason=(f"Fault not confirmed by vehicle within {spec.within_s}s after inject (no matching STATUSTEXT)."),
         evidence=ev,
     )
 
 
-def infer_fault_inject_time(timeline: Timeline) -> float | None:
-    ev = timeline.first("fault_injected")
-    return float(ev.t_boot_ms) if ev is not None else None
+def infer_fault_inject_time(timeline: Timeline, rule: "RuleFile | None" = None) -> float | None:
+    """
+    Fault time from the first matching fault_injected event.
+    PARM-derived events use kinds ``rc_loss`` / ``battery_low``; rule YAML uses longer names.
+    """
+    inject_kinds: list[str] = []
+    if rule is not None:
+        for st in rule.scenario:
+            if st.step == "inject_fault":
+                inject_kinds.append(str(st.args.get("kind", "")).lower())
+
+    def _matches(ev: TimelineEvent) -> bool:
+        ek = str(ev.payload.get("kind", "")).lower()
+        if not inject_kinds:
+            return True
+        for want in inject_kinds:
+            if "battery" in want and "battery" in ek:
+                return True
+            if ("rc" in want or "loss" in want) and "rc" in ek:
+                return True
+        return False
+
+    for ev in timeline.events:
+        if ev.type != "fault_injected":
+            continue
+        if not inject_kinds:
+            return float(ev.t_boot_ms)
+        if _matches(ev):
+            return float(ev.t_boot_ms)
+    return None

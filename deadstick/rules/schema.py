@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Annotated, Any, Literal, Union
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
@@ -53,7 +53,6 @@ class ScenarioStep(BaseModel):
 class ConfirmFaultAnyOf(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    log_err: dict[str, Any] | None = None
     statustext: str | None = None
 
 
@@ -69,6 +68,12 @@ class ExpectCheck(BaseModel):
 
     check: str
     payload: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def forbid_anchor_ms(self) -> ExpectCheck:
+        if "anchor_ms" in self.payload:
+            raise ValueError('expect blocks must not use "anchor_ms"; anchoring comes from fault_injected / PARM only')
+        return self
 
     @model_validator(mode="before")
     @classmethod
@@ -101,9 +106,7 @@ class RuleFile(BaseModel):
     def check_expectations(self) -> RuleFile:
         for e in self.expect:
             if e.check not in IMPLEMENTED_CHECKS:
-                raise ValueError(
-                    f'ERROR: no check implemented for "{e.check}" (rule {self.id})'
-                )
+                raise ValueError(f'ERROR: no check implemented for "{e.check}" (rule {self.id})')
         return self
 
 

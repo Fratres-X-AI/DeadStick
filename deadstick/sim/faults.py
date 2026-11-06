@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from pymavlink import mavutil
 
 from deadstick.sim.link import set_param

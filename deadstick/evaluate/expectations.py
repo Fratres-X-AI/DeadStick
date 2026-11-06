@@ -107,9 +107,7 @@ def apply_precondition(
     return Result(rule_id=rule_id, verdict=Verdict.CANNOT_JUDGE, reason=msg)
 
 
-def fs_thr_disabled_gate(
-    *, rule_id: str, kind: RuleKind, params: dict[str, float]
-) -> Result | None:
+def fs_thr_disabled_gate(*, rule_id: str, kind: RuleKind, params: dict[str, float]) -> Result | None:
     if "FS_THR_ENABLE" not in params:
         return None
     if float(params["FS_THR_ENABLE"]) != 0.0:
@@ -118,6 +116,65 @@ def fs_thr_disabled_gate(
     if kind is RuleKind.requirement:
         return Result(rule_id=rule_id, verdict=Verdict.FAIL, reason=msg)
     return Result(rule_id=rule_id, verdict=Verdict.CANNOT_JUDGE, reason=msg)
+
+
+_RC_FSOPT_RADIO_RELEVANT = re.compile(r"rc failsafe|any failsafe", re.IGNORECASE)
+
+_FILLER_PREFIXES: tuple[str, ...] = (
+    "enabled always ",
+    "enabled ",
+)
+
+
+def _split_on_or(label: str) -> list[str]:
+    return [p.strip() for p in label.split(" or ") if p.strip()]
+
+
+def _strip_action_filler(fragment: str) -> str:
+    t = fragment.strip()
+    low = t.lower()
+    while True:
+        matched = False
+        for pre in _FILLER_PREFIXES:
+            if low.startswith(pre):
+                t = t[len(pre) :].strip()
+                low = t.lower()
+                matched = True
+                break
+        if not matched:
+            break
+    return t
+
+
+def modes_from_metadata_value_label(label: str) -> tuple[list[str] | None, str | None]:
+    """
+    Parse ArduPilot value labels like 'Enabled always SmartRTL or RTL' into mode tokens.
+    Returns (modes, None) or (None, CANNOT_JUDGE reason). Never guesses unknown phrases.
+    """
+    raw = str(label).strip()
+    if not raw:
+        return None, "Empty firmware metadata label."
+
+    out: list[str] = []
+    for part in _split_on_or(raw):
+        core = _strip_action_filler(part)
+
+        def one_mode(t: str) -> str | None:
+            if re.search(r"(?i)SmartRTL", t):
+                return "SMART_RTL"
+            if re.search(r"(?i)\bRTL\b", t):
+                return "RTL"
+            if re.search(r"(?i)\bLand\b", t):
+                return "LAND"
+            if re.search(r"(?i)\bBrake\b", t):
+                return "BRAKE"
+            return None
+
+        mode = one_mode(core)
+        if mode is None:
+            return None, f"Unmapped action phrase in firmware metadata label: {raw!r}"
+        out.append(mode)
+    return out, None
 
 
 def rc_loss_modes_from_metadata(
@@ -131,13 +188,34 @@ def rc_loss_modes_from_metadata(
     # bitmask in fake metadata uses descriptive keys; bits from ArduPilot
     meta_fsopt = param_entry(metadata, "FS_OPTIONS")
     if isinstance(meta_fsopt, dict) and isinstance(meta_fsopt.get("bitmask"), dict):
-        bits = bitmask_bits_set(fsopt, {k: int(v) for k, v in meta_fsopt["bitmask"].items()})
-        # Bit 5: Continue mission in auto modes — value may vary; we key by metadata text
-        for name, bit in meta_fsopt["bitmask"].items():
-            if int(bit) == 5 and 5 in bits and "Continue" in name:
+        bm = meta_fsopt["bitmask"]
+        bits = bitmask_bits_set(fsopt, bm)
+        entries: list[tuple[int, str]] = []
+        sample_k = next(iter(bm.keys()), "")
+        if str(sample_k).isdigit():
+            for idx_s, label in bm.items():
+                entries.append((int(idx_s), str(label)))
+        else:
+            for label, idx in bm.items():
+                entries.append((int(idx), str(label)))
+
+        for _bi, label in entries:
+            if _bi not in bits:
+                continue
+            low = label.lower()
+            if not _RC_FSOPT_RADIO_RELEVANT.search(label):
+                continue
+            if "continue" not in low:
+                continue
+            if "auto" in low and "gcs" not in low and "rc" in low:
                 return None, (
                     "FS_OPTIONS has continue-in-auto set; expected outcome is continue "
                     "(no RTL). This bench has no Auto rule yet — CANNOT_JUDGE for rc_loss_action."
+                )
+            if "guided" in low and "gcs" not in low and "rc" in low:
+                return None, (
+                    "FS_OPTIONS has continue-in-guided set; expected outcome is continue in GUIDED "
+                    "(no RTL). This bench does not model that path — CANNOT_JUDGE for rc_loss_action."
                 )
 
     ent = param_entry(metadata, "FS_THR_ENABLE")
@@ -147,12 +225,12 @@ def rc_loss_modes_from_metadata(
     values = ent.get("values")
     if not isinstance(values, dict) or val is None:
         return None, "FS_THR_ENABLE values missing in metadata."
-    label = str(values.get(val, "")).lower()
-    if "rtl" in label:
-        return ["RTL"], None
-    if "land" in label or "landing" in label:
-        return ["LAND"], None
-    return None, f"FS_THR_ENABLE value {val} meaning not recognized in metadata."
+    label = str(values.get(val, ""))
+    modes, err = modes_from_metadata_value_label(label)
+    if err:
+        return None, err
+    assert modes is not None
+    return modes, None
 
 
 def rc_loss_action_modes(
@@ -176,14 +254,15 @@ def batt_low_modes_from_metadata(
     if not isinstance(values, dict):
         return None, "BATT_FS_LOW_ACT values missing in metadata."
     val = str(int(float(act)))
-    label = str(values.get(val, "")).lower()
-    if "land" in label:
-        return ["LAND"], None
-    if "rtl" in label:
-        return ["RTL"], None
-    if val == "0" or "none" in label:
+    raw_label = str(values.get(val, ""))
+    low = raw_label.lower()
+    if val == "0" or "none" in low or "warn only" in low:
         return None, "Battery low action is none/disabled — requirement FAIL handled elsewhere."
-    return None, f"BATT_FS_LOW_ACT value {val} meaning not recognized."
+    modes, err = modes_from_metadata_value_label(raw_label)
+    if err:
+        return None, err
+    assert modes is not None
+    return modes, None
 
 
 def normalize_statustext_pattern(pat: str) -> re.Pattern[str]:

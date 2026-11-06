@@ -7,7 +7,7 @@ import pytest
 from deadstick.timeline.dataflash import bin_to_timeline
 
 
-@pytest.mark.needs_pod_log
+@pytest.mark.needs_sitl_log
 def test_bin_reader_smoke(repo_root: Path) -> None:
     """Unskip when the pod commits a small sample under tests/fixtures/dataflash/."""
     p = repo_root / "tests" / "fixtures" / "dataflash" / "sample.bin"
