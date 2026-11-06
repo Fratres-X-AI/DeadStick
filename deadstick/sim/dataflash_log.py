@@ -4,13 +4,15 @@ from pathlib import Path
 
 
 def find_latest_dataflash_bin(workdir: Path) -> Path | None:
-    """Return the newest ArduPilot dataflash *.BIN under workdir (prefers logs/)."""
+    """Return the newest ArduPilot dataflash ``*.BIN`` under ``workdir/logs/`` only.
+
+    Flight logs are under ``logs/`` with an uppercase ``.BIN`` extension. Do not treat
+    ``eeprom.bin`` or other non-log binaries in the workdir root as dataflash.
+    """
     logs = workdir / "logs"
-    roots = [logs, workdir] if logs.is_dir() else [workdir]
-    bins: list[Path] = []
-    for root in roots:
-        bins.extend(root.rglob("*.BIN"))
-        bins.extend(root.rglob("*.bin"))
+    if not logs.is_dir():
+        return None
+    bins = list(logs.glob("*.BIN"))
     if not bins:
         return None
     return max(bins, key=lambda p: p.stat().st_mtime)
