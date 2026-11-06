@@ -14,9 +14,9 @@ scenario:
       kind: rc_loss_while_disarmed
 confirm_fault:
   any_of:
-    - statustext: "(?i)radio.*failsafe|prearm.*radio"
+    - statustext: "(?i)prearm.*radio"
   within_s: 5
 expect:
   - check: expect_arming_refused
     within_s: 6
-    pattern: (?i)prearm|radio|failsafe
+    pattern: (?i)prearm.*radio

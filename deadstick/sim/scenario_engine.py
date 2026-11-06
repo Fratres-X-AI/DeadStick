@@ -62,7 +62,7 @@ def _worst(rows: list[Result]) -> Verdict:
 def _prelude_for_inject_kind(kind: str) -> list[tuple[str, dict[str, Any]]]:
     k = kind.lower()
     if "rc_loss_while_disarmed" in k:
-        return []
+        return [("wait_ready", {"timeout_s": 180.0})]
     if "rc_loss_in_air" in k or "battery" in k:
         return [
             ("wait_ready", {"timeout_s": 180.0}),
@@ -298,6 +298,33 @@ def run_rule_on_sitl(
     )
 
 
+def _probe_armable_before_r01_fault(mav: mavutil.mavlink_connection) -> None:
+    """
+    r01 needs the vehicle armable (GPS/EKF ready) before RC loss; otherwise any
+    PreArm refusal could be misread as radio-gating.
+    """
+    ok_arm, _code = send_arm_command(mav, arm=True, timeout_s=10.0)
+    if ok_arm:
+        send_arm_command(mav, arm=False, timeout_s=10.0)
+        return
+
+    lines: list[str] = []
+    t_end = time.monotonic() + 4.0
+    while time.monotonic() < t_end:
+        m = mav.recv_match(type=["STATUSTEXT"], blocking=False)
+        if m is not None:
+            text = str(getattr(m, "text", "") or "")
+            if text.strip():
+                lines.append(text)
+        else:
+            time.sleep(0.05)
+    snippet = " | ".join(lines[-12:]) if lines else "no STATUSTEXT"
+    raise RuntimeError(
+        "vehicle not armable before fault; cannot test r01. "
+        f"Recorded statustext: {snippet}"
+    )
+
+
 def append_param_digest_events(
     missing: list[str], rejected: list[str], t_ms: float
 ) -> list[TimelineEvent]:
@@ -412,6 +439,8 @@ def _exec_step(
 
     if name in ("inject", "inject_fault"):
         kind = str(args.get("kind", ""))
+        if "rc_loss_while_disarmed" in kind.lower():
+            _probe_armable_before_r01_fault(mav)
         t0 = t_now()
         if "rc_loss" in kind:
             fi.inject_rc_loss()
