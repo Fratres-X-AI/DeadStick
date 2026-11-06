@@ -39,8 +39,6 @@ deadstick --help
 - **Fault time for `.BIN`** comes from `PARM` lines (`SIM_RC_FAIL`, `SIM_BATT_VOLTAGE` below `BATT_LOW_VOLT`) as synthetic `fault_injected` events; pass the same `.param` values into `deadstick run` so thresholds match.
 - **Rules** no longer use `anchor_ms`; expectation windows anchor on `fault_injected` (or schema error if `anchor_ms` appears).
 - **`LOG_DISARMED`** is applied before reboot in `sitl-run` so disarmed rules still get logs.
-- **`scripts/pod_pulse.sh`**: optional pod heartbeat loop (e.g. `bash scripts/pod_pulse.sh 20 120` for 20 check-ins, 120s apart).
-
 ## How to read a `FAIL`
 
 A **`FAIL`** means: the fault was injected and **confirmed** by the vehicle (STATUSTEXT / ERR in the log within `confirm_fault.within_s`), then an expectation check saw forbidden or missing behavior.
