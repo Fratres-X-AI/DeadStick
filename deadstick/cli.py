@@ -75,11 +75,6 @@ def run_cmd(
         "-o",
         help="results/<run_id> output (default: auto)",
     ),
-    allow_fake: bool = typer.Option(
-        False,
-        "--allow-fake-metadata",
-        help="Only for tests: allow FAKE_ / fake metadata (no real verdicts).",
-    ),
     speedup: float = typer.Option(1.0, "--speedup", help="Record simulator speedup for provenance."),
     seed: Optional[int] = typer.Option(None, "--seed", help="Random seed for provenance."),
 ) -> None:
@@ -96,12 +91,11 @@ def run_cmd(
     rf = load_rule(rule)
     param_map = load_param_file(params)
     meta = load_metadata(metadata)
-    if not allow_fake:
-        try:
-            assert_not_fake_metadata(metadata, meta)
-        except ValueError as exc:
-            console.print(f"[red]{exc}[/red]")
-            raise typer.Exit(code=2) from exc
+    try:
+        assert_not_fake_metadata(metadata, meta)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=2) from exc
 
     timeline_jsonl = load_jsonl(log) if log.suffix.lower() == ".jsonl" else None
     if dataflash is not None:
@@ -188,7 +182,6 @@ def sitl_run(
         "--observe-after-inject-s",
         help="MAVLink poll window after inject (in-air rules).",
     ),
-    allow_fake: bool = typer.Option(False, "--allow-fake-metadata"),
     seed: Optional[int] = typer.Option(None, "--seed"),
 ) -> None:
     """Run one rule against live SITL on this machine (Linux/RunPod)."""
@@ -196,12 +189,11 @@ def sitl_run(
     from deadstick.sim.scenario_engine import run_rule_on_sitl
 
     meta = load_metadata(metadata)
-    if not allow_fake:
-        try:
-            assert_not_fake_metadata(metadata, meta)
-        except ValueError as exc:
-            console.print(f"[red]{exc}[/red]")
-            raise typer.Exit(code=2) from exc
+    try:
+        assert_not_fake_metadata(metadata, meta)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(code=2) from exc
 
     out = run_rule_on_sitl(
         rule_path=rule,
@@ -214,7 +206,6 @@ def sitl_run(
         tcp_base_port=tcp_base,
         instance=instance,
         observe_after_inject_s=observe_after_inject_s,
-        allow_fake_metadata=allow_fake,
         seed=seed,
     )
     table = Table(title=f"SITL results for {out.results[0].rule_id if out.results else '?'}")
@@ -244,7 +235,6 @@ def run_all(
     log: Path = typer.Option(..., "--log", "-l"),
     dataflash: Optional[Path] = typer.Option(None, "--dataflash", "-b"),
     out_dir: Optional[Path] = typer.Option(None, "--out-dir", "-o"),
-    allow_fake: bool = typer.Option(False, "--allow-fake-metadata"),
 ) -> None:
     """Run every rule YAML in a directory sequentially (one verdict set per rule)."""
     run_id = str(uuid.uuid4())[:8]
@@ -256,10 +246,9 @@ def run_all(
         rf = load_rule(rule_path)
         param_map = load_param_file(params)
         meta = load_metadata(metadata)
-        if not allow_fake:
-            from deadstick.metadata import assert_not_fake_metadata
+        from deadstick.metadata import assert_not_fake_metadata
 
-            assert_not_fake_metadata(metadata, meta)
+        assert_not_fake_metadata(metadata, meta)
         if dataflash is not None:
             timeline = bin_to_timeline(dataflash, params=param_map)
         elif log.suffix.lower() == ".jsonl":

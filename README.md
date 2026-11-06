@@ -26,7 +26,7 @@ deadstick --help
 | Command | Purpose |
 |--------|---------|
 | `deadstick explain rules/copter/r01_….yaml` | Rule summary; **no** simulator. |
-| `deadstick run -r RULE -p PARAMS -m METADATA -l TIMELINE.jsonl [--dataflash X.BIN]` | Evaluate; refuses `FAKE_*` metadata / `"fake": true` unless `--allow-fake-metadata`. Verdict from **`.BIN`** when `--dataflash` is set (vehicle record). |
+| `deadstick run -r RULE -p PARAMS -m METADATA -l TIMELINE.jsonl [--dataflash X.BIN]` | Evaluate; refuses `FAKE_*` metadata / `"fake": true`. Verdict from **`.BIN`** when `--dataflash` is set (vehicle record). |
 | `deadstick run-all --rules-dir rules/copter -p … -m … -l …` | All rules in folder, sequential. |
 | `deadstick sitl-run …` | Live SITL on Linux/RunPod (see `--help`); writes `results/sitl_<id>/`. |
 | `deadstick report results/.../result.json` | Short summary. |
@@ -53,7 +53,7 @@ Example (abbreviated):
 
 ## Fake metadata guard
 
-`tests/fixtures/metadata/FAKE_copter_min.json` is **unit-test only** (`"fake": true`). The CLI refuses it for real runs unless `--allow-fake-metadata`.
+`tests/fixtures/metadata/FAKE_copter_min.json` is **unit-test only** (`"fake": true`). The CLI refuses it for real runs; use metadata from `metadata/` or the pod build.
 
 Pod-generated metadata belongs in `metadata/Copter-<tag>.json` (see plan phase 2).
 

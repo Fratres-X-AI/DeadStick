@@ -167,7 +167,7 @@ def run_rule_on_sitl(
     tcp_base_port: int = 5760,
     instance: int = 0,
     observe_after_inject_s: float = 45.0,
-    allow_fake_metadata: bool = False,
+    _allow_fake_metadata_for_tests: bool = False,
     seed: int | None = None,
 ) -> SitlRunResult:
     """
@@ -182,7 +182,7 @@ def run_rule_on_sitl(
     timeline_path = run_dir / "timeline.jsonl"
     rule = load_rule(rule_path)
     meta = load_metadata(metadata_path)
-    if not allow_fake_metadata:
+    if not _allow_fake_metadata_for_tests:
         assert_not_fake_metadata(metadata_path, meta)
 
     tcp_port = tcp_base_port + int(instance) * 10
