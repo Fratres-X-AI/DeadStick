@@ -25,9 +25,17 @@ def test_rc_loss_rtl_from_metadata(copter_metadata: dict) -> None:
     assert modes == ["RTL"]
 
 
-def test_rc_loss_continue_auto_cannot_judge(copter_metadata: dict) -> None:
+def test_rc_loss_continue_auto_on_rc_cannot_judge(copter_metadata: dict) -> None:
     modes, err = rc_loss_modes_from_metadata(
-        copter_metadata, {"FS_THR_ENABLE": 1.0, "FS_OPTIONS": 32.0}
+        copter_metadata, {"FS_THR_ENABLE": 1.0, "FS_OPTIONS": 1.0}
     )
     assert modes is None
-    assert err is not None and "continue" in err.lower()
+    assert err is not None and "auto" in err.lower()
+
+
+def test_rc_loss_continue_guided_on_rc_cannot_judge(copter_metadata: dict) -> None:
+    modes, err = rc_loss_modes_from_metadata(
+        copter_metadata, {"FS_THR_ENABLE": 1.0, "FS_OPTIONS": 4.0}
+    )
+    assert modes is None
+    assert err is not None and "guided" in err.lower()

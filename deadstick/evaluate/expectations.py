@@ -131,19 +131,29 @@ def rc_loss_modes_from_metadata(
     # bitmask in fake metadata uses descriptive keys; bits from ArduPilot
     meta_fsopt = param_entry(metadata, "FS_OPTIONS")
     if isinstance(meta_fsopt, dict) and isinstance(meta_fsopt.get("bitmask"), dict):
-        bits = bitmask_bits_set(fsopt, {k: int(v) for k, v in meta_fsopt["bitmask"].items()})
-        # Bit 5: Continue mission in auto modes — value may vary; we key by metadata text
-        for name, bit in meta_fsopt["bitmask"].items():
-            bi = int(bit)
-            if bi != 5 or 5 not in bits:
+        bm = meta_fsopt["bitmask"]
+        bits = bitmask_bits_set(fsopt, bm)
+        entries: list[tuple[int, str]] = []
+        sample_k = next(iter(bm.keys()), "")
+        if str(sample_k).isdigit():
+            for idx_s, label in bm.items():
+                entries.append((int(idx_s), str(label)))
+        else:
+            for label, idx in bm.items():
+                entries.append((int(idx), str(label)))
+
+        for _bi, label in entries:
+            if _bi not in bits:
                 continue
-            low = name.lower()
-            if "continue" in low and "auto" in low:
+            low = label.lower()
+            if "continue" not in low:
+                continue
+            if "auto" in low:
                 return None, (
                     "FS_OPTIONS has continue-in-auto set; expected outcome is continue "
                     "(no RTL). This bench has no Auto rule yet — CANNOT_JUDGE for rc_loss_action."
                 )
-            if "guided" in low and "continue" in low:
+            if "guided" in low:
                 return None, (
                     "FS_OPTIONS has continue-in-guided set; expected outcome is continue in GUIDED "
                     "(no RTL). This bench does not model that path — CANNOT_JUDGE for rc_loss_action."

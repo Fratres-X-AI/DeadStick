@@ -15,7 +15,14 @@ MIN_COPTER_METADATA: dict[str, Any] = {
             }
         },
         "FS_OPTIONS": {
-            "bitmask": {"Continue mission in AUTO on FS": 5},
+            "bitmask": {
+                "0": "Continue if in Auto on RC failsafe",
+                "1": "Continue if in Auto on GCS failsafe",
+                "2": "Continue if in Guided on RC failsafe",
+                "3": "Continue if landing on any failsafe",
+                "4": "Continue if in pilot controlled modes on GCS failsafe",
+                "5": "Release Gripper",
+            },
         },
         "BATT_FS_LOW_ACT": {
             "values": {"0": "None", "1": "Land", "2": "RTL"},
