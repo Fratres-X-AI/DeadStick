@@ -9,11 +9,12 @@ LOCK="${ROOT}/ardupilot.lock"
 cd "$ROOT"
 
 if [ ! -d "$AP_DIR" ]; then
-  git clone --depth 1 https://github.com/ArduPilot/ardupilot.git
+  # Need full tag list for Copter-4.7.* — shallow clone has no tags
+  git clone https://github.com/ArduPilot/ardupilot.git
 fi
 
 cd "$AP_DIR"
-git fetch --tags --depth 1
+git fetch --tags --force
 TAG="$(git tag -l 'Copter-4.7.*' | sort -V | tail -1)"
 if [ -z "$TAG" ]; then
   echo "No Copter-4.7.* tag found"
