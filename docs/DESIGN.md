@@ -64,16 +64,26 @@ Event times in timelines use **milliseconds since boot**, derived from ArduPilot
 
 ```mermaid
 flowchart LR
-  R[Rule YAML] --> H[Harness scenario]
-  P[Param file] --> H
-  M[Pinned firmware metadata] --> E[Evaluator]
-  H --> L[Flight log .BIN or JSONL]
-  L --> T[Timeline]
-  T --> G[Fault confirm gate]
-  G --> C[Expectation checks]
-  C --> V[Verdict]
-  M --> E
-  P --> E
+  R[Rule YAML]
+  P[Param file]
+  M[Pinned firmware metadata]
+  S[SITL scenario]
+  F[Fault injection]
+  L[Flight log .BIN]
+  T[Timeline from log]
+  G[Fault confirm gate]
+  C[Expectation checks]
+  V[Verdict]
+
+  R --> S
+  P --> S
+  M --> C
+  S --> F
+  F --> L
+  L --> T
+  T --> G
+  G --> C
+  C --> V
 ```
 
-This diagram is a guide for readers; filenames and commands live in the README.
+The harness (`deadstick sitl-run`) produces the flight log; `deadstick run` reads an existing log. Both feed the same evaluator.

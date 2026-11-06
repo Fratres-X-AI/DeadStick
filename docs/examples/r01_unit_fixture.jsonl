@@ -1,0 +1,3 @@
+{"t_boot_ms": 800.0, "type": "fault_injected", "payload": {"kind": "rc_loss_while_disarmed"}}
+{"t_boot_ms": 810, "type": "statustext", "payload": {"text": "PreArm: Radio failsafe on"}}
+{"t_boot_ms": 920, "type": "statustext", "payload": {"text": "PreArm: Radio failsafe on"}}
