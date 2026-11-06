@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-[HEAVY] Parallel matrix: rules x param files x repeats (RunPod).
+Parallel matrix: rules x param files x repeats (Linux host).
 Requires SITL binaries and metadata; v1 is a skeleton that lists work items.
 """
 from __future__ import annotations

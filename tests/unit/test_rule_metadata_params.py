@@ -17,7 +17,7 @@ def _repo_has_copter_metadata() -> bool:
 
 @pytest.mark.skipif(
     not _repo_has_copter_metadata(),
-    reason="metadata/Copter-*.json only after build_sitl on RunPod",
+    reason="metadata/Copter-*.json only after scripts/build_sitl.sh",
 )
 def test_r01_through_r03_params_in_shipped_metadata(repo_root: Path) -> None:
     meta_files = list((repo_root / "metadata").glob("Copter-*.json"))

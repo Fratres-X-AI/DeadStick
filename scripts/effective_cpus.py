@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Print effective CPU count for cgroup quota (RunPod), else os.cpu_count()."""
+"""Print effective CPU count for cgroup quota (Linux host), else os.cpu_count()."""
 from __future__ import annotations
 
 import math

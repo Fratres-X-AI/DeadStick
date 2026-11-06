@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Run on the pod as root after `git pull` (no install-prereqs-ubuntu; waf build optional).
+# Regenerate normalized Copter metadata and ardupilot.lock when ardupilot/ is already
+# checked out (assumes ./waf copter was run). Compiles ArduPilot SITL; slow, many cores.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 AP_DIR="${ROOT}/ardupilot"
@@ -30,7 +31,6 @@ else
   python3 Tools/autotest/param_metadata/param_parse.py --vehicle=Copter --format=json
 fi
 cp -f "${AP_DIR}/apm.pdef.json" "${META_DIR}/apm.pdef.raw.json"
-# TAG is already e.g. Copter-4.7.2 — avoid Copter-Copter-4.7.2.json
 OUT_META="${META_DIR}/${TAG}.json"
 python3 "${ROOT}/scripts/normalize_apm_pdef.py" "${META_DIR}/apm.pdef.raw.json" "$OUT_META"
 META_HASH="$(sha256sum "$OUT_META" | awk '{print $1}')"

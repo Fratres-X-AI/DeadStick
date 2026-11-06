@@ -44,7 +44,7 @@ def run_rule_scenario_stub(
 ) -> ScenarioResult:
     """
     Minimal harness: start SITL, connect, apply params, inject fault from rule,
-    record MAVLink JSONL. Full flight script (takeoff/GUIDED) is phase-3 extended.
+    record MAVLink JSONL. Longer takeoff and air scenarios can be added later.
     """
     from deadstick.sim.sitl import SitlProcess
 

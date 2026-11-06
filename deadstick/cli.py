@@ -184,7 +184,7 @@ def sitl_run(
     ),
     seed: Optional[int] = typer.Option(None, "--seed"),
 ) -> None:
-    """Run one rule against live SITL on this machine (Linux/RunPod)."""
+    """Run one rule against live SITL on this machine (Linux x86-64)."""
     from deadstick.metadata import assert_not_fake_metadata
     from deadstick.sim.scenario_engine import run_rule_on_sitl
 

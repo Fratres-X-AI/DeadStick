@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# [HEAVY] Run on RunPod CPU only — builds ArduCopter SITL and writes ardupilot.lock
+# Compiles ArduPilot SITL; takes a long time and uses many CPU cores. Run on a Linux host.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -47,7 +47,7 @@ mkdir -p "$META_DIR"
   fi
 )
 cp -f "${AP_DIR}/apm.pdef.json" "${META_DIR}/apm.pdef.raw.json"
-OUT_META="${META_DIR}/Copter-${TAG}.json"
+OUT_META="${META_DIR}/${TAG}.json"
 python3 "${ROOT}/scripts/normalize_apm_pdef.py" "${META_DIR}/apm.pdef.raw.json" "$OUT_META"
 META_HASH="$(sha256sum "$OUT_META" | awk '{print $1}')"
 
