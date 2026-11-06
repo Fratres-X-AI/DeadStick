@@ -1,66 +1,85 @@
-# DeadStick (autopilot safety bench)
+# DeadStick — what your drone does when something dies
+
+DeadStick runs **scripted faults** against **ArduPilot SITL**, records a **flight log**, and **judges** the result against **YAML rules** and your **parameter file**. Simulated, logged, judged — never “proven safe.”
 
 [![CI](https://github.com/Fratres-X-AI/DeadStick/actions/workflows/ci.yml/badge.svg)](https://github.com/Fratres-X-AI/DeadStick/actions/workflows/ci.yml)
 
-Python CLI: **rule YAML** + **`.param`** + **firmware metadata** + **log** → `PASS` / `FAIL` / `CANNOT_JUDGE` / `ERROR`.
+## Status
 
-- **`ERROR`**: harness or missing signal — not a verdict on the autopilot.
-- Results describe behavior **observed in simulation** under stated conditions — never “proven safe,” “certified,” or “guaranteed.”
+**Early development.** The evaluation engine and unit tests work. **Live SITL runs** through `deadstick sitl-run` are still being brought up. **Not ready** for operational use.
 
-Upstream: [Fratres-X-AI/DeadStick](https://github.com/Fratres-X-AI/DeadStick)
+## What it does
 
-Also installed as `apbench` for compatibility with the build plan name.
+1. You write or pick a **rule** (YAML): what should happen under a fault (radio loss, battery low, etc.).
+2. You supply a **parameter file** (`.param`) and **firmware metadata** (JSON derived from the pinned ArduCopter tree — see `ardupilot.lock`).
+3. The **harness** drives SITL, injects the fault, and produces a **flight log** (`.BIN` preferred).
+4. `deadstick run` (or the harness) evaluates the log on the **timeline** built from that record. The **verdict** is from the **log**, not from a live telemetry guess.
 
-## Install (dev)
+Design details: [docs/DESIGN.md](docs/DESIGN.md).
+
+## Verdicts
+
+| Verdict | When |
+|--------|------|
+| **PASS** | Every check passed for that rule on the supplied log and parameters. |
+| **FAIL** | A check failed after the fault was confirmed (when confirmation is required). |
+| **CANNOT_JUDGE** | Missing parameters, precondition false, ambiguous metadata, unknown fault time, or fault not confirmed — no behavioral FAIL. |
+| **ERROR** | Bad inputs, harness failure, or evaluator error — not a verdict on the vehicle. |
+
+## Quick start
 
 ```bash
 git clone https://github.com/Fratres-X-AI/DeadStick.git
 cd DeadStick
 python3 -m venv .venv
 ./.venv/bin/pip install -e ".[dev]"
-deadstick --help
+deadstick explain rules/copter/r01_rc_loss_disarmed_blocks_arming.yaml
+python -m pytest tests/unit -q
 ```
 
-## Commands
+For offline evaluation you need a rule, params, metadata JSON under `metadata/`, and a timeline (`.jsonl` or `.BIN`). See `deadstick run --help`.
 
-| Command | Purpose |
-|--------|---------|
-| `deadstick explain rules/copter/r01_….yaml` | Rule summary; **no** simulator. |
-| `deadstick run -r RULE -p PARAMS -m METADATA -l TIMELINE.jsonl [--dataflash X.BIN]` | Evaluate; refuses `FAKE_*` metadata / `"fake": true`. Verdict from **`.BIN`** when `--dataflash` is set (vehicle record). |
-| `deadstick run-all --rules-dir rules/copter -p … -m … -l …` | All rules in folder, sequential. |
-| `deadstick sitl-run …` | Live SITL on Linux/RunPod (see `--help`); writes `results/sitl_<id>/`. |
-| `deadstick report results/.../result.json` | Short summary. |
+## Running live simulations
 
-## Pre–phase-3 correctness (SITL / dataflash)
+Use a **Linux x86-64** machine (physical or virtual) with enough CPU and disk to build ArduCopter SITL.
 
-- **MAVLink to SITL** uses `tcp:` (bare `host:port` in pymavlink is UDP). Default in `deadstick.sim.link.connect` is `tcp:127.0.0.1:5760`.
-- **`.BIN` time base** uses `TimeUS / 1000` as milliseconds since boot (not pymavlink’s wall-clock `_timestamp`).
-- **MODE** rows from dataflash map numeric mode via `mavutil.mode_mapping_acm`; unknown numbers → `UNKNOWN_n` and mode checks return **CANNOT_JUDGE**, not false FAIL.
-- **Fault time for `.BIN`** comes from `PARM` lines (`SIM_RC_FAIL`, `SIM_BATT_VOLTAGE` below `BATT_LOW_VOLT`) as synthetic `fault_injected` events; pass the same `.param` values into `deadstick run` so thresholds match.
-- **Rules** no longer use `anchor_ms`; expectation windows anchor on `fault_injected` (or schema error if `anchor_ms` appears).
-- **`LOG_DISARMED`** is applied before reboot in `sitl-run` so disarmed rules still get logs.
+1. Clone this repository and the `ardupilot` submodule or tree expected by `scripts/build_sitl.sh`.
+2. Run **`scripts/build_sitl.sh`** to build the **pinned** ArduCopter Copter SITL. The build **takes a long time** and uses **many CPU cores**; no GPU is required for SITL.
+3. Run **`deadstick sitl-run --help`** for arguments (rule path, params, metadata, path to `arducopter` binary, results directory).
+
 ## How to read a `FAIL`
 
-A **`FAIL`** means: the fault was injected and **confirmed** by the vehicle (STATUSTEXT / ERR in the log within `confirm_fault.within_s`), then an expectation check saw forbidden or missing behavior.
+A **`FAIL`** means the fault was **injected**, **confirmed** in the log (for example STATUSTEXT within `confirm_fault.within_s` after the inject time), and an **expectation check** then found forbidden or missing behavior (wrong mode, altitude, arming when it should be refused, etc.).
 
 Example (abbreviated):
 
-- **Rule**: requirement — on RC loss, enter configured failsafe mode within the time bound.
-- **Parameter**: `FS_THR_ENABLE` meaning RTL from metadata + params file.
-- **Timeline**: `fault_injected` at *t*, confirmation “radio failsafe” at *t+200ms*, no `RTL` mode before *t + limit* → **FAIL**, with the mode trace in `evidence`.
+- **Rule**: requirement — on RC loss, enter the configured failsafe mode within the time bound.
+- **Parameter meaning**: from metadata + your `.param` values (for example RTL vs Land from `FS_THR_ENABLE`).
+- **Timeline**: `fault_injected` at *t*, confirmation text at *t + 200ms*, no expected mode change before *t + limit* → **FAIL**, with evidence on the timeline attached to the result.
 
-## Fake metadata guard
+## Starter rules
 
-`tests/fixtures/metadata/FAKE_copter_min.json` is **unit-test only** (`"fake": true`). The CLI refuses it for real runs; use metadata from `metadata/` or the pod build.
+| Rule | One-line |
+|------|----------|
+| **r01** | Radio failsafe enabled and RC-loss while disarmed → arming must be refused (conformance). |
+| **r02** | RC loss with RTL configured → vehicle must enter RTL within the bound (requirement). |
+| **r03** | Battery low action set to land → battery-low inject must lead to LAND (requirement). |
 
-Pod-generated metadata belongs in `metadata/Copter-<tag>.json` (see `docs/DESIGN.md`).
+Files: `rules/copter/r01_*.yaml`, `r02_*.yaml`, `r03_*.yaml`.
 
-## Layout
+## Safety notice
 
-- `deadstick/` — package (evaluate, timeline, rules, sim harness, reports).
-- `rules/copter/` — YAML rules.
-- `scripts/build_sitl.sh` — **[HEAVY]** ArduPilot SITL on RunPod CPU only.
-- `scripts/matrix_run.py` — matrix skeleton (phase 5).
-- `.github/workflows/ci.yml` — `pytest` on push/PR.
+Results describe behavior **observed in ArduPilot SITL** under the stated parameters, rules, and logs. They are **not** a guarantee of real-world behavior, **not** certification, and **not** a substitute for flight testing. The bench only talks to a **local simulator**; there is **no** code path to arm a real aircraft from this tool.
 
-Design and evaluation model: [docs/DESIGN.md](docs/DESIGN.md).
+## Contributing
+
+Bug reports and pull requests are welcome. Please run `python -m pytest tests/unit -q` before submitting. A change must never weaken a check just to make a run pass.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Acknowledgements
+
+- [ArduPilot](https://ardupilot.org/) — autopilot firmware and SITL.
+- [pymavlink](https://github.com/ArduPilot/pymavlink) — MAVLink parsing and helpers.
