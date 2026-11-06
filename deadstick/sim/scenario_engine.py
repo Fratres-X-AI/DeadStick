@@ -32,7 +32,6 @@ from deadstick.sim.link import (
 )
 from deadstick.sim.sitl import SitlProcess
 from deadstick.timeline.dataflash import bin_to_timeline
-from deadstick.timeline.jsonl import load_jsonl
 from deadstick.timeline.model import Timeline, TimelineEvent
 from deadstick.timeline.recorder import append_events, poll_mavlink_to_timeline
 from deadstick.verdict import Result, Verdict
@@ -69,6 +68,45 @@ def _worst(rows: list[Result]) -> Verdict:
         if order.index(r.verdict) > order.index(worst):
             worst = r.verdict
     return worst
+
+
+def evaluate_run_artifacts(
+    *,
+    rule: RuleFile,
+    metadata: dict[str, Any],
+    vehicle_params: dict[str, float],
+    file_params: dict[str, float],
+    dataflash_path: Path | None,
+    timeline_jsonl_path: Path | None,
+    harness_error: str | None,
+) -> tuple[Verdict, list[Result]]:
+    eval_params = vehicle_params if vehicle_params else file_params
+    tl_bin: Timeline | None = None
+    if dataflash_path is not None:
+        tl_bin = bin_to_timeline(dataflash_path, params=eval_params)
+
+    if harness_error:
+        rows = [
+            Result(
+                rule_id=rule.id,
+                verdict=Verdict.ERROR,
+                reason=f"Harness error: {harness_error}",
+            )
+        ]
+        return Verdict.ERROR, rows
+
+    if dataflash_path is None or tl_bin is None or not tl_bin.events:
+        rows = [
+            Result(
+                rule_id=rule.id,
+                verdict=Verdict.ERROR,
+                reason="no dataflash log produced",
+            )
+        ]
+        return Verdict.ERROR, rows
+
+    rows = evaluate_rule(rule=rule, params=eval_params, metadata=metadata, timeline=tl_bin)
+    return _worst(rows), rows
 
 
 def _prelude_for_inject_kind(kind: str) -> list[tuple[str, dict[str, Any]]]:
@@ -230,39 +268,15 @@ def run_rule_on_sitl(
 
     dataflash = find_latest_dataflash_bin(sitl_work)
     params_from_file = load_param_file(param_path)
-    eval_params = reported if reported else params_from_file
-
-    tl_json: Timeline | None = None
-    if timeline_jsonl_written and timeline_path.exists():
-        tl_json = load_jsonl(timeline_path)
-    tl_bin: Timeline | None = None
-    if dataflash is not None:
-        tl_bin = bin_to_timeline(dataflash, params=eval_params)
-
-    if harness_error:
-        rows = [
-            Result(
-                rule_id=rule.id,
-                verdict=Verdict.ERROR,
-                reason=f"Harness error: {harness_error}",
-            )
-        ]
-        verdict = Verdict.ERROR
-    elif tl_bin is not None and tl_bin.events:
-        rows = evaluate_rule(rule=rule, params=eval_params, metadata=meta, timeline=tl_bin)
-        verdict = _worst(rows)
-    elif tl_json is not None and tl_json.events:
-        rows = evaluate_rule(rule=rule, params=eval_params, metadata=meta, timeline=tl_json)
-        verdict = _worst(rows)
-    else:
-        rows = [
-            Result(
-                rule_id=rule.id,
-                verdict=Verdict.ERROR,
-                reason="No timeline from SITL (empty or missing JSONL and dataflash).",
-            )
-        ]
-        verdict = Verdict.ERROR
+    verdict, rows = evaluate_run_artifacts(
+        rule=rule,
+        metadata=meta,
+        vehicle_params=reported,
+        file_params=params_from_file,
+        dataflash_path=dataflash,
+        timeline_jsonl_path=timeline_path if timeline_jsonl_written else None,
+        harness_error=harness_error,
+    )
 
     prov = build_provenance(
         param_path=param_path,
