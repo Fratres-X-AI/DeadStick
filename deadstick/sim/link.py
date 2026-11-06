@@ -22,21 +22,26 @@ def connect_with_retry(url: str, *, timeout_s: float = 90.0) -> mavutil.mavlink_
     """Connect with pymavlink and wait for HEARTBEAT; retry until *timeout_s*.
 
     Avoid raw TCP probes: opening and closing TCP to SERIAL0 breaks the real MAVLink
-    session on ArduPilot SITL. The first successful connection attempt is what keeps
-    the link stable for the vehicle.
+    session on ArduPilot SITL.
+
+    Do **not** close a live pymavlink connection after only a few seconds without a
+    HEARTBEAT — that is effectively another hang-up and can strand the simulator the
+    same way a raw port check does. On success, keep reading until the global
+    deadline; only close to retry after ``mavlink_connection`` fails or the deadline
+    expires without a heartbeat.
     """
     deadline = time.monotonic() + float(timeout_s)
     while time.monotonic() < deadline:
         conn: mavutil.mavlink_connection | None = None
         try:
             conn = mavutil.mavlink_connection(url, autoreconnect=True)
-            hb_deadline = time.monotonic() + 5.0
-            while time.monotonic() < hb_deadline:
-                m = conn.recv_match(type="HEARTBEAT", blocking=True, timeout=1)
-                if m is not None:
-                    return conn
         except Exception:
-            pass
+            time.sleep(1.0)
+            continue
+        while time.monotonic() < deadline:
+            m = conn.recv_match(type="HEARTBEAT", blocking=True, timeout=1.0)
+            if m is not None:
+                return conn
         if conn is not None:
             try:
                 conn.close()
