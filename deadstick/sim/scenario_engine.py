@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -48,6 +49,17 @@ class SitlRunResult:
     harness_error: str | None = None
     not_applied: list[str] = field(default_factory=list)
     rejected: list[str] = field(default_factory=list)
+
+
+def _haversine_m(lat1_deg: float, lon1_deg: float, lat2_deg: float, lon2_deg: float) -> float:
+    r_earth = 6371000.0
+    p1 = math.radians(lat1_deg)
+    p2 = math.radians(lat2_deg)
+    dlat = math.radians(lat2_deg - lat1_deg)
+    dlon = math.radians(lon2_deg - lon1_deg)
+    a = math.sin(dlat / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlon / 2) ** 2
+    c = 2 * math.asin(min(1.0, math.sqrt(a)))
+    return r_earth * c
 
 
 def _worst(rows: list[Result]) -> Verdict:
@@ -217,7 +229,6 @@ def run_rule_on_sitl(
             pass
 
     dataflash = find_latest_dataflash_bin(sitl_work)
-
     params_from_file = load_param_file(param_path)
     eval_params = reported if reported else params_from_file
 
@@ -427,36 +438,53 @@ def _exec_step(
 
     if name == "move_north":
         dist_m = float(args["m"])
-        deadline = time.monotonic() + 45.0
-        lat_deg: float | None = None
-        lon_deg: float | None = None
-        alt_m = 0.0
+        deadline = time.monotonic() + 15.0
+        start_lat: float | None = None
+        start_lon: float | None = None
+        cur_lat: float | None = None
+        cur_lon: float | None = None
         while time.monotonic() < deadline:
-            m = mav.recv_match(type="GLOBAL_POSITION_INT", blocking=False)
-            if m is not None:
-                lat_deg = float(m.lat) / 1.0e7
-                lon_deg = float(m.lon) / 1.0e7
-                alt_m = float(m.relative_alt) / 1000.0
+            gp = mav.recv_match(type="GLOBAL_POSITION_INT", blocking=False)
+            if gp is not None:
+                start_lat = float(gp.lat) / 1.0e7
+                start_lon = float(gp.lon) / 1.0e7
                 break
             time.sleep(0.05)
-        if lat_deg is None or lon_deg is None:
-            raise RuntimeError("move_north: no GLOBAL_POSITION_INT")
+        if start_lat is None or start_lon is None:
+            raise RuntimeError("move_north: no GLOBAL_POSITION_INT for start")
         dlat = dist_m / 111_320.0
-        tgt_lat = lat_deg + dlat
-        mav.mav.command_long_send(
+        tgt_lat = start_lat + dlat
+        tgt_lon = start_lon
+        alt_m = 20.0
+        mav.mav.command_int_send(
             mav.target_system,
             mav.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
             mavutil.mavlink.MAV_CMD_DO_REPOSITION,
+            0,
             0,
             -1.0,
             0,
             0,
-            float(tgt_lat),
-            float(lon_deg),
-            float(alt_m),
+            int(round(tgt_lat * 1.0e7)),
+            int(round(tgt_lon * 1.0e7)),
+            alt_m,
         )
-        poll_mavlink_to_timeline(mav, out_path=timeline_path, duration_s=20.0, append=True)
-        return
+        poll_mavlink_to_timeline(mav, out_path=timeline_path, duration_s=3.0, append=True)
+
+        arrive_deadline = time.monotonic() + 60.0
+        while time.monotonic() < arrive_deadline:
+            gp = mav.recv_match(type="GLOBAL_POSITION_INT", blocking=False)
+            if gp is not None:
+                cur_lat = float(gp.lat) / 1.0e7
+                cur_lon = float(gp.lon) / 1.0e7
+                rel_alt = float(gp.relative_alt) / 1000.0
+                horiz = _haversine_m(start_lat, start_lon, cur_lat, cur_lon)
+                if horiz + 0.5 >= 90.0 and 15.0 - 0.5 <= rel_alt <= 25.0 + 0.5:
+                    poll_mavlink_to_timeline(mav, out_path=timeline_path, duration_s=2.0, append=True)
+                    return
+            time.sleep(0.05)
+        raise RuntimeError("reposition not reached")
 
     if name == "hold":
         time.sleep(float(args["seconds"]))
