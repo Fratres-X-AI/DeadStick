@@ -83,3 +83,7 @@ MIT — see [LICENSE](LICENSE).
 
 - [ArduPilot](https://ardupilot.org/) — autopilot firmware and SITL.
 - [pymavlink](https://github.com/ArduPilot/pymavlink) — MAVLink parsing and helpers.
+
+### Third-party generated data
+
+Firmware parameter metadata under `metadata/` is generated from ArduPilot sources. See [metadata/README.md](metadata/README.md) for origin and license notes.
