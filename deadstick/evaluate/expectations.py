@@ -134,10 +134,19 @@ def rc_loss_modes_from_metadata(
         bits = bitmask_bits_set(fsopt, {k: int(v) for k, v in meta_fsopt["bitmask"].items()})
         # Bit 5: Continue mission in auto modes — value may vary; we key by metadata text
         for name, bit in meta_fsopt["bitmask"].items():
-            if int(bit) == 5 and 5 in bits and "Continue" in name:
+            bi = int(bit)
+            if bi != 5 or 5 not in bits:
+                continue
+            low = name.lower()
+            if "continue" in low and "auto" in low:
                 return None, (
                     "FS_OPTIONS has continue-in-auto set; expected outcome is continue "
                     "(no RTL). This bench has no Auto rule yet — CANNOT_JUDGE for rc_loss_action."
+                )
+            if "guided" in low and "continue" in low:
+                return None, (
+                    "FS_OPTIONS has continue-in-guided set; expected outcome is continue in GUIDED "
+                    "(no RTL). This bench does not model that path — CANNOT_JUDGE for rc_loss_action."
                 )
 
     ent = param_entry(metadata, "FS_THR_ENABLE")

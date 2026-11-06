@@ -70,7 +70,6 @@ def _prelude_for_inject_kind(kind: str) -> list[tuple[str, dict[str, Any]]]:
             ("arm", {}),
             ("takeoff", {"alt_m": 20.0}),
             ("move_north", {"m": 100.0}),
-            ("set_mode", {"mode": "LOITER"}),
             ("hold", {"seconds": 5.0}),
         ]
     return []
@@ -298,6 +297,32 @@ def run_rule_on_sitl(
     )
 
 
+def _assert_preflight_in_air_fault(mav: mavutil.mavlink_connection) -> None:
+    """Armed, GUIDED, and enough relative altitude before RC/battery inject."""
+    deadline = time.monotonic() + 15.0
+    while time.monotonic() < deadline:
+        hb = mav.recv_match(type="HEARTBEAT", blocking=False)
+        gp = mav.recv_match(type="GLOBAL_POSITION_INT", blocking=False)
+        if hb is None or gp is None:
+            time.sleep(0.04)
+            continue
+        armed = bool(hb.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED)
+        mapping = mav.mode_mapping()
+        mode_name = ""
+        if mapping:
+            want = hb.custom_mode
+            for nm, num in mapping.items():
+                if int(num) == int(want):
+                    mode_name = str(nm)
+                    break
+        guided = mode_name.upper() == "GUIDED"
+        rel_m = float(gp.relative_alt) / 1000.0
+        if armed and guided and rel_m + 1e-6 >= 15.0:
+            return
+        time.sleep(0.02)
+    raise RuntimeError("precondition for in-flight fault not reached (armed/GUIDED/15m not confirmed)")
+
+
 def _probe_armable_before_r01_fault(mav: mavutil.mavlink_connection) -> None:
     """
     r01 needs the vehicle armable (GPS/EKF ready) before RC loss; otherwise any
@@ -439,8 +464,11 @@ def _exec_step(
 
     if name in ("inject", "inject_fault"):
         kind = str(args.get("kind", ""))
-        if "rc_loss_while_disarmed" in kind.lower():
+        kl = kind.lower()
+        if "rc_loss_while_disarmed" in kl:
             _probe_armable_before_r01_fault(mav)
+        elif "rc_loss_in_air" in kl or "battery" in kl:
+            _assert_preflight_in_air_fault(mav)
         t0 = t_now()
         if "rc_loss" in kind:
             fi.inject_rc_loss()
