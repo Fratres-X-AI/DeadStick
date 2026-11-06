@@ -53,7 +53,7 @@ Example (abbreviated):
 
 `tests/fixtures/metadata/FAKE_copter_min.json` is **unit-test only** (`"fake": true`). The CLI refuses it for real runs; use metadata from `metadata/` or the pod build.
 
-Pod-generated metadata belongs in `metadata/Copter-<tag>.json` (see plan phase 2).
+Pod-generated metadata belongs in `metadata/Copter-<tag>.json` (see `docs/DESIGN.md`).
 
 ## Layout
 
@@ -63,11 +63,4 @@ Pod-generated metadata belongs in `metadata/Copter-<tag>.json` (see plan phase 2
 - `scripts/matrix_run.py` — matrix skeleton (phase 5).
 - `.github/workflows/ci.yml` — `pytest` on push/PR.
 
-## RunPod notes
-
-See [AUTOPILOT_SAFETY_BENCH_PLAN.md](AUTOPILOT_SAFETY_BENCH_PLAN.md).
-
-- **Pod class:** this stack is **CPU/RAM**-bound (SITL build + Python). Use whatever RunPod tier has enough cores and disk for `./waf copter`. If the only available template is GPU-class but you need the **CPU** count (e.g. 32 vCPU), that’s fine — you don’t need to use the GPU. Prefer a cheaper CPU-oriented template **when RunPod offers one** so you’re not paying for idle silicon; there isn’t always one. **Do not install CUDA** unless you add a GPU workload later.
-- **Shell on Windows:** drive SSH/SCP from **Git Bash** (or WSL bash), not PowerShell — PowerShell mangles `ssh` quoting, `$()`, and heredocs.
-- **Parallelism:** `scripts/build_sitl.sh` and `scripts/matrix_run.py` derive worker / `waf -j` counts from **cgroup CPU quota** first (`scripts/cgroup_effective_cpus.sh` and `scripts/effective_cpus.py`), then fall back to `nproc` / `os.cpu_count()`.
-- Ubuntu images may need a venv under `/root` and `PYTEST_ADDOPTS='-o cache_dir=/tmp/...'` if `/workspace` disallows `.pytest_cache`.
+Design and evaluation model: [docs/DESIGN.md](docs/DESIGN.md).
