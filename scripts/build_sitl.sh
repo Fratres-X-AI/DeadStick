@@ -28,8 +28,10 @@ if [ -f Tools/environment_install/install-prereqs-ubuntu.sh ]; then
 fi
 
 ./waf configure --board sitl
-NPROC="$(nproc 2>/dev/null || echo 4)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+NPROC="$("$SCRIPT_DIR/cgroup_effective_cpus.sh" 2>/dev/null || nproc 2>/dev/null || echo 4)"
 JOBS=$(( NPROC > 2 ? NPROC - 2 : 1 ))
+echo "effective_cpus=$NPROC waf_jobs=$JOBS (cgroup-first)" | tee -a "${ROOT}/sitl_build.log" >> /tmp/deadstick_sitl_build.log
 ./waf copter -j "$JOBS"
 
 COMMIT="$(git rev-parse HEAD)"

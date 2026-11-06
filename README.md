@@ -56,4 +56,9 @@ Pod-generated metadata belongs in `metadata/Copter-<tag>.json` (see plan phase 2
 
 ## RunPod notes
 
-See [AUTOPILOT_SAFETY_BENCH_PLAN.md](AUTOPILOT_SAFETY_BENCH_PLAN.md). Ubuntu images may need a venv under `/root` and `PYTEST_ADDOPTS='-o cache_dir=/tmp/...'` if `/workspace` disallows `.pytest_cache`.
+See [AUTOPILOT_SAFETY_BENCH_PLAN.md](AUTOPILOT_SAFETY_BENCH_PLAN.md).
+
+- **Pod class:** use a **CPU** pod for SITL builds and the checker (e.g. ~16 vCPU, ~32 GB RAM, ~100 GB disk). **Do not** use a GPU SKU (e.g. A100) for this work — and **do not install CUDA** on the builder.
+- **Shell on Windows:** drive SSH/SCP from **Git Bash** (or WSL bash), not PowerShell — PowerShell mangles `ssh` quoting, `$()`, and heredocs.
+- **Parallelism:** `scripts/build_sitl.sh` and `scripts/matrix_run.py` derive worker / `waf -j` counts from **cgroup CPU quota** first (`scripts/cgroup_effective_cpus.sh` and `scripts/effective_cpus.py`), then fall back to `nproc` / `os.cpu_count()`.
+- Ubuntu images may need a venv under `/root` and `PYTEST_ADDOPTS='-o cache_dir=/tmp/...'` if `/workspace` disallows `.pytest_cache`.
