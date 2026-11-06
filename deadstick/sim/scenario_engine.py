@@ -11,7 +11,7 @@ from pymavlink import mavutil
 from deadstick.evaluate.runner import evaluate_rule
 from deadstick.metadata import assert_not_fake_metadata, load_metadata
 from deadstick.param_file import load_param_file
-from deadstick.provenance import build_provenance
+from deadstick.provenance import build_provenance, sha256_file
 from deadstick.report.json_report import write_result_json
 from deadstick.report.md_report import write_report_md
 from deadstick.rules.loader import load_rule
@@ -153,6 +153,7 @@ def run_rule_on_sitl(
     dataflash: Path | None = None
     not_applied: list[str] = []
     rejected: list[str] = []
+    reported: dict[str, float] = {}
 
     try:
         if timeline_path.exists():
@@ -218,14 +219,15 @@ def run_rule_on_sitl(
 
     dataflash = find_latest_dataflash_bin(sitl_work)
 
+    params_from_file = load_param_file(param_path)
+    eval_params = reported if reported else params_from_file
+
     tl_json: Timeline | None = None
     if timeline_jsonl_written and timeline_path.exists():
         tl_json = load_jsonl(timeline_path)
     tl_bin: Timeline | None = None
     if dataflash is not None:
-        tl_bin = bin_to_timeline(dataflash, params=params_float)
-
-    params_float = load_param_file(param_path)
+        tl_bin = bin_to_timeline(dataflash, params=eval_params)
 
     if harness_error:
         rows = [
@@ -237,10 +239,10 @@ def run_rule_on_sitl(
         ]
         verdict = Verdict.ERROR
     elif tl_bin is not None and tl_bin.events:
-        rows = evaluate_rule(rule=rule, params=params_float, metadata=meta, timeline=tl_bin)
+        rows = evaluate_rule(rule=rule, params=eval_params, metadata=meta, timeline=tl_bin)
         verdict = _worst(rows)
     elif tl_json is not None and tl_json.events:
-        rows = evaluate_rule(rule=rule, params=params_float, metadata=meta, timeline=tl_json)
+        rows = evaluate_rule(rule=rule, params=eval_params, metadata=meta, timeline=tl_json)
         verdict = _worst(rows)
     else:
         rows = [
@@ -262,6 +264,9 @@ def run_rule_on_sitl(
             "mavlink": mavlink_url,
             "not_applied": not_applied,
             "rejected": rejected,
+            "file_params_not_applied": not_applied,
+            "file_params_rejected": rejected,
+            "file_params_sha256": sha256_file(param_path),
         },
     )
     write_result_json(
