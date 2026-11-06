@@ -35,14 +35,16 @@ def bin_to_timeline(path: Path, *, params: dict[str, float] | None = None) -> Ti
     wall-clock _timestamp — it is not comparable to live-link time_boot_ms.
 
     Emits fault_injected from PARM rows: SIM_RC_FAIL != 0 (rc_loss), and
-    SIM_BATT_VOLTAGE when below BATT_LOW_VOLT from params (default heuristic if absent).
+    SIM_BATT_VOLTAGE below BATT_LOW_VOLT only when that threshold exists in params.
     """
     from pymavlink import mavutil
 
     reader = mavutil.mavlink_connection(str(path))
 
     events: list[TimelineEvent] = []
-    batt_low_v = float(params.get("BATT_LOW_VOLT", 10.5)) if params else 10.5
+    batt_low_v: float | None = None
+    if params and "BATT_LOW_VOLT" in params:
+        batt_low_v = float(params["BATT_LOW_VOLT"])
 
     types = ("MODE", "MSG", "EV", "ERR", "CTUN", "PARM")
     while True:
@@ -130,7 +132,12 @@ def bin_to_timeline(path: Path, *, params: dict[str, float] | None = None) -> Ti
                         payload={"kind": "rc_loss", "source": "PARM_SIM_RC_FAIL"},
                     )
                 )
-            elif pname == "SIM_BATT_VOLTAGE" and val > 0.0 and val < batt_low_v:
+            elif (
+                pname == "SIM_BATT_VOLTAGE"
+                and batt_low_v is not None
+                and val > 0.0
+                and val < batt_low_v
+            ):
                 events.append(
                     TimelineEvent(
                         t_boot_ms=t_ms,
