@@ -19,35 +19,44 @@ def connect(tcp: str = "tcp:127.0.0.1:5760") -> mavutil.mavlink_connection:
 
 
 def connect_with_retry(url: str, *, timeout_s: float = 90.0) -> mavutil.mavlink_connection:
-    """Connect with pymavlink and wait for HEARTBEAT; retry until *timeout_s*.
+    """Connect with pymavlink and wait for HEARTBEAT.
 
-    Avoid raw TCP probes: opening and closing TCP to SERIAL0 breaks the real MAVLink
-    session on ArduPilot SITL.
+    **Retry only** while ``mavlink_connection`` fails (e.g. connection refused — port
+    not listening yet). Sleep 1s between attempts.
 
-    Do **not** close a live pymavlink connection after only a few seconds without a
-    HEARTBEAT — that is effectively another hang-up and can strand the simulator the
-    same way a raw port check does. On success, keep reading until the global
-    deadline; only close to retry after ``mavlink_connection`` fails or the deadline
-    expires without a heartbeat.
+    **After** a connection is established, keep that same connection and wait for a
+    HEARTBEAT until *timeout_s* elapses from the **start** of the call. Do **not**
+    close and reopen during startup: doing so hangs up on SITL SERIAL0 and repeats the
+    bug raw TCP probes caused.
+
+    If the overall deadline passes with no heartbeat, close the connection and raise
+    ``TimeoutError`` (harness maps to ERROR: no heartbeat).
     """
     deadline = time.monotonic() + float(timeout_s)
-    while time.monotonic() < deadline:
-        conn: mavutil.mavlink_connection | None = None
+    conn: mavutil.mavlink_connection | None = None
+    while conn is None:
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"Could not connect to {url!r} within {timeout_s}s")
         try:
             conn = mavutil.mavlink_connection(url, autoreconnect=True)
-        except Exception:
+        except (OSError, ConnectionError):
             time.sleep(1.0)
-            continue
-        while time.monotonic() < deadline:
-            m = conn.recv_match(type="HEARTBEAT", blocking=True, timeout=1.0)
-            if m is not None:
-                return conn
-        if conn is not None:
-            try:
-                conn.close()
-            except Exception:
-                pass
-        time.sleep(1.0)
+
+    while time.monotonic() < deadline:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        m = conn.recv_match(
+            type="HEARTBEAT",
+            blocking=True,
+            timeout=min(1.0, remaining),
+        )
+        if m is not None:
+            return conn
+    try:
+        conn.close()
+    except Exception:
+        pass
     raise TimeoutError(f"No HEARTBEAT from {url!r} within {timeout_s}s")
 
 
