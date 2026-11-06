@@ -1,3 +1,0 @@
-os=Ubuntu 24.04.5 LTS
-ldd (Ubuntu GLIBC 2.39-0ubuntu8.9) 2.39
-x86_64
