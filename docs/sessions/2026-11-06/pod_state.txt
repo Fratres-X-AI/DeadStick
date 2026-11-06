@@ -1,0 +1,28 @@
+date_utc=2026-11-06T15:57:19Z
+repo_head=3ddc219
+git_status:
+lock:
+tag=Copter-4.7.2
+commit=fb773567896014da007bca58358704d4a0d8516f
+built_at=2026-11-06T15:03:02Z
+metadata_json=/root/DeadStick/metadata/Copter-4.7.2.json
+metadata_sha256=5c92e9eede2a96a40cc7f7af8541ed56de28786aa7c9d850924e14ba0cc3c84a
+binary:
+-rwxr-xr-x 1 root root 5636528 Nov  6 15:03 ardupilot/build/sitl/bin/arducopter
+os:
+Ubuntu 24.04.5 LTS
+ldd (Ubuntu GLIBC 2.39-0ubuntu8.9) 2.39
+x86_64
+runs:
+results/sitl_2c6fd1bc-eef/
+results/sitl_438b7f1f-9c2/
+results/sitl_dbf72dfa-88b/
+results/sitl_b4ab2590-ef5/
+results/sitl_74c333e2-efa/
+results/sitl_ff012cc5-37f/
+results/sitl_a1554859-823/
+results/sitl_dbf1a7f7-73d/
+results/sitl_15eea992-8b6/
+results/sitl_9ed03e18-008/
+results/sitl_e5075337-736/
+results/sitl_153951be-58c/
