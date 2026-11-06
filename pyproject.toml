@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "deadstick"
+version = "0.1.0"
+description = "Autopilot safety bench — operator rules against SITL logs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+dependencies = [
+  "pymavlink>=2.4.40",
+  "pyyaml>=6.0",
+  "pydantic>=2.0",
+  "typer>=0.12.0",
+  "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+deadstick = "deadstick.cli:app"
+apbench = "deadstick.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["deadstick"]
+
+[tool.pytest.ini_options]
+markers = [
+  "needs_pod_log: needs a real ArduPilot .BIN fixture from the pod",
+]
+testpaths = ["tests"]
+pythonpath = ["."]

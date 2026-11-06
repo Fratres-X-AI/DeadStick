@@ -1,0 +1,24 @@
+id: r01_rc_loss_disarmed_blocks_arming
+say: >-
+  With radio failsafe enabled, an RC-loss fault while disarmed must block arming
+  (conformance with expected prearm gating).
+kind: conformance
+vehicle: copter
+requires_params:
+  - FS_THR_ENABLE
+precondition:
+  expr: FS_THR_ENABLE != 0
+  reason_if_not: Radio failsafe is disabled; this rule does not apply.
+scenario:
+  - inject_fault:
+      kind: rc_loss_while_disarmed
+      at_ms: 1000
+confirm_fault:
+  any_of:
+    - statustext: "(?i)radio.*failsafe|prearm.*radio"
+  within_s: 5
+expect:
+  - check: expect_arming_refused
+    anchor_ms: 900
+    within_s: 6
+    pattern: (?i)prearm|radio|failsafe

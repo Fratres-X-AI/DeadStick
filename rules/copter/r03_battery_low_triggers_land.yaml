@@ -1,0 +1,24 @@
+id: r03_battery_low_triggers_land
+say: >-
+  When battery failsafe low action is set to land, a battery-low condition must
+  lead to LAND (requirement).
+kind: requirement
+vehicle: copter
+requires_params:
+  - BATT_FS_LOW_ACT
+precondition:
+  expr: BATT_FS_LOW_ACT != 0
+  reason_if_not: Battery low action disabled — requirement not applicable.
+scenario:
+  - inject_fault:
+      kind: battery_low
+      at_ms: 3000
+confirm_fault:
+  any_of:
+    - statustext: "(?i)battery.*failsafe|batt.*fs|low.*battery"
+  within_s: 5
+expect:
+  - check: expect_mode_within
+    anchor_ms: 3000
+    within_s: 45
+    modes_from: expectations.batt_low_action
