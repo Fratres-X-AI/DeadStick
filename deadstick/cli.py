@@ -172,7 +172,7 @@ def sitl_run(
     defaults: Optional[Path] = typer.Option(
         None,
         "--defaults",
-        help="Optional --defaults .parm for SITL.",
+        help="SITL --defaults .parm (default: ardupilot/Tools/autotest/default_params/copter.parm under repo).",
     ),
     speedup: float = typer.Option(1.0, "--speedup"),
     tcp_base: int = typer.Option(5760, "--tcp-base", help="SERIAL0 base port (5760 + instance*10)."),

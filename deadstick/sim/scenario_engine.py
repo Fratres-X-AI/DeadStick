@@ -13,6 +13,7 @@ from deadstick.evaluate.runner import evaluate_rule
 from deadstick.metadata import assert_not_fake_metadata, load_metadata
 from deadstick.param_file import load_param_file
 from deadstick.provenance import build_provenance, sha256_file
+from deadstick.repo import resolve_sitl_defaults_parm
 from deadstick.report.json_report import write_result_json
 from deadstick.report.md_report import write_report_md
 from deadstick.rules.loader import load_rule
@@ -21,14 +22,13 @@ from deadstick.sim.dataflash_log import find_latest_dataflash_bin
 from deadstick.sim.faults import FaultInjector
 from deadstick.sim.link import (
     apply_param_file,
-    connect,
+    connect_with_retry,
     drain_ack_results,
     reboot_and_reconnect,
     send_arm_command,
     set_mode_apm,
     set_param,
     vehicle_time_boot_ms,
-    wait_heartbeat,
 )
 from deadstick.sim.sitl import SitlProcess
 from deadstick.timeline.dataflash import bin_to_timeline
@@ -188,16 +188,9 @@ def run_rule_on_sitl(
     tcp_port = tcp_base_port + int(instance) * 10
     mavlink_url = f"tcp:127.0.0.1:{tcp_port}"
 
-    sitl = SitlProcess(
-        arducopter_bin=arducopter_bin,
-        workdir=sitl_work,
-        speedup=speedup,
-        tcp_port=tcp_port,
-        instance=int(instance),
-        defaults_parm=defaults_parm,
-    )
-
     harness_error: str | None = None
+    sitl: SitlProcess | None = None
+    defaults_resolved: Path | None = None
     timeline_jsonl_written = False
     dataflash: Path | None = None
     not_applied: list[str] = []
@@ -205,11 +198,23 @@ def run_rule_on_sitl(
     reported: dict[str, float] = {}
 
     try:
+        try:
+            defaults_resolved = resolve_sitl_defaults_parm(defaults_parm)
+        except FileNotFoundError as exc:
+            harness_error = str(exc)
+            raise
+        sitl = SitlProcess(
+            arducopter_bin=arducopter_bin,
+            workdir=sitl_work,
+            speedup=speedup,
+            tcp_port=tcp_port,
+            instance=int(instance),
+            defaults_parm=defaults_resolved,
+        )
         if timeline_path.exists():
             timeline_path.unlink()
         sitl.start()
-        mav = connect(mavlink_url)
-        wait_heartbeat(mav)
+        mav = connect_with_retry(mavlink_url)
 
         reported, missing, rej = apply_param_file(mav, param_path)
         not_applied = missing
@@ -261,10 +266,11 @@ def run_rule_on_sitl(
     except Exception as exc:  # noqa: BLE001
         harness_error = str(exc)
     finally:
-        try:
-            sitl.stop()
-        except Exception:
-            pass
+        if sitl is not None:
+            try:
+                sitl.stop()
+            except Exception:
+                pass
 
     dataflash = find_latest_dataflash_bin(sitl_work)
     params_from_file = load_param_file(param_path)
@@ -278,20 +284,24 @@ def run_rule_on_sitl(
         harness_error=harness_error,
     )
 
+    extra_prov: dict[str, Any] = {
+        "sitl_instance": instance,
+        "mavlink": mavlink_url,
+        "not_applied": not_applied,
+        "rejected": rejected,
+        "file_params_not_applied": not_applied,
+        "file_params_rejected": rejected,
+        "file_params_sha256": sha256_file(param_path),
+    }
+    if defaults_resolved is not None:
+        extra_prov["sitl_defaults_file"] = str(defaults_resolved)
+        extra_prov["sitl_defaults_sha256"] = sha256_file(defaults_resolved)
     prov = build_provenance(
         param_path=param_path,
         rule_path=rule_path,
         simulator_speedup=speedup,
         random_seed=seed,
-        extra={
-            "sitl_instance": instance,
-            "mavlink": mavlink_url,
-            "not_applied": not_applied,
-            "rejected": rejected,
-            "file_params_not_applied": not_applied,
-            "file_params_rejected": rejected,
-            "file_params_sha256": sha256_file(param_path),
-        },
+        extra=extra_prov,
     )
     write_result_json(
         run_dir / "result.json",

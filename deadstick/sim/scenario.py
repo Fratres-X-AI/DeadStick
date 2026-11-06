@@ -9,8 +9,9 @@ from typing import Any
 from deadstick.rules.schema import RuleFile
 from deadstick.timeline.model import TimelineEvent
 from deadstick.timeline.recorder import append_events, record_mavlink_to_jsonl
+from deadstick.repo import resolve_sitl_defaults_parm
 from deadstick.sim.faults import FaultInjector
-from deadstick.sim.link import apply_param_file, connect, wait_heartbeat
+from deadstick.sim.link import apply_param_file, connect_with_retry
 
 
 @dataclass
@@ -55,19 +56,19 @@ def run_rule_scenario_stub(
         timeline_path.unlink()
 
     tcp_port = 5760
+    defaults_path = resolve_sitl_defaults_parm(defaults_parm)
     sitl = SitlProcess(
         arducopter_bin=arducopter_bin,
         workdir=sitl_dir,
         speedup=speedup,
         tcp_port=tcp_port,
         instance=0,
-        defaults_parm=defaults_parm,
+        defaults_parm=defaults_path,
     )
     inj = _find_inject_step(rule)
     try:
         sitl.start()
-        mav = connect(f"tcp:127.0.0.1:{tcp_port}")
-        wait_heartbeat(mav)
+        mav = connect_with_retry(f"tcp:127.0.0.1:{tcp_port}")
         reported, missing, rejected = apply_param_file(mav, param_path)
         fi = FaultInjector(mav)
         fi.refresh_param_names(reported)

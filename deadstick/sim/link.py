@@ -18,6 +18,34 @@ def connect(tcp: str = "tcp:127.0.0.1:5760") -> mavutil.mavlink_connection:
     return mavutil.mavlink_connection(tcp, autoreconnect=True)
 
 
+def connect_with_retry(url: str, *, timeout_s: float = 90.0) -> mavutil.mavlink_connection:
+    """Connect with pymavlink and wait for HEARTBEAT; retry until *timeout_s*.
+
+    Avoid raw TCP probes: opening and closing TCP to SERIAL0 breaks the real MAVLink
+    session on ArduPilot SITL. The first successful connection attempt is what keeps
+    the link stable for the vehicle.
+    """
+    deadline = time.monotonic() + float(timeout_s)
+    while time.monotonic() < deadline:
+        conn: mavutil.mavlink_connection | None = None
+        try:
+            conn = mavutil.mavlink_connection(url, autoreconnect=True)
+            hb_deadline = time.monotonic() + 5.0
+            while time.monotonic() < hb_deadline:
+                m = conn.recv_match(type="HEARTBEAT", blocking=True, timeout=1)
+                if m is not None:
+                    return conn
+        except Exception:
+            pass
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+        time.sleep(1.0)
+    raise TimeoutError(f"No HEARTBEAT from {url!r} within {timeout_s}s")
+
+
 def wait_heartbeat(mav: mavutil.mavlink_connection, timeout_s: float = 30.0) -> None:
     t0 = time.monotonic()
     while time.monotonic() - t0 < timeout_s:
@@ -215,39 +243,12 @@ def preflight_reboot(mav: mavutil.mavlink_connection) -> None:
 
 
 def reboot_and_reconnect(url: str, *, settle_s: float = 5.0) -> mavutil.mavlink_connection:
-    """Send reboot on *url*, wait for TCP to come back, return a fresh connection."""
-    mav = connect(url)
+    """Send reboot on *url*, then reconnect with MAVLink retry (no raw TCP probe)."""
+    mav = connect_with_retry(url)
     preflight_reboot(mav)
     try:
         mav.close()
     except Exception:
         pass
-    import time as _time
-
-    _time.sleep(settle_s)
-    wait_tcp_port_open(url, timeout_s=120.0)
-    out = connect(url)
-    wait_heartbeat(out)
-    return out
-
-
-def _host_port_from_tcp_url(url: str) -> tuple[str, int]:
-    s = url.replace("tcp:", "").strip()
-    host, _, port_s = s.partition(":")
-    return host.strip(), int(port_s.strip())
-
-
-def wait_tcp_port_open(url: str, *, timeout_s: float = 120.0) -> None:
-    """After reboot, wait until SERIAL0 accepts TCP again."""
-    import socket
-
-    host, port = _host_port_from_tcp_url(url)
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        try:
-            s = socket.create_connection((host, port), timeout=1.0)
-            s.close()
-            return
-        except OSError:
-            time.sleep(0.2)
-    raise TimeoutError(f"TCP {host}:{port} did not open within {timeout_s}s")
+    time.sleep(settle_s)
+    return connect_with_retry(url, timeout_s=90.0)

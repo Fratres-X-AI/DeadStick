@@ -1,24 +1,9 @@
 from __future__ import annotations
 
-import os
 import signal
-import socket
 import subprocess
-import time
 from pathlib import Path
 from typing import IO
-
-
-def wait_tcp_open(host: str, port: int, timeout_s: float = 60.0) -> None:
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        try:
-            s = socket.create_connection((host, port), timeout=1.0)
-            s.close()
-            return
-        except OSError:
-            time.sleep(0.2)
-    raise TimeoutError(f"TCP {host}:{port} did not open within {timeout_s}s")
 
 
 class SitlProcess:
@@ -33,7 +18,7 @@ class SitlProcess:
         speedup: float = 1.0,
         tcp_port: int = 5760,
         instance: int = 0,
-        defaults_parm: Path | None = None,
+        defaults_parm: Path,
         home: str = "-35.363261,149.165230,584,353",
     ) -> None:
         self.arducopter_bin = arducopter_bin
@@ -68,8 +53,7 @@ class SitlProcess:
             "--speedup",
             str(self.speedup),
         ]
-        if self.defaults_parm is not None:
-            cmd.extend(["--defaults", str(self.defaults_parm)])
+        cmd.extend(["--defaults", str(self.defaults_parm)])
         # SITL SERIAL0 is tcp:5760 + instance*10 (see ArduPilot SITL).
         self._proc = subprocess.Popen(
             cmd,
@@ -78,7 +62,9 @@ class SitlProcess:
             stderr=subprocess.STDOUT,
             text=True,
         )
-        wait_tcp_open("127.0.0.1", self.tcp_port, timeout_s=90.0)
+        # Do not open a raw TCP probe here: SITL treats that as a connect+hangup and
+        # breaks the real MAVLink client's first connection. The harness connects via
+        # ``connect_with_retry`` in link.py.
 
     def stop(self) -> None:
         if self._proc is None:
