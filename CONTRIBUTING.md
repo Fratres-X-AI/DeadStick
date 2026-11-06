@@ -17,6 +17,16 @@ python -m pytest tests/unit -q
 
 Pull requests should keep this suite green.
 
+## Lint and types
+
+```bash
+ruff check .
+ruff format --check .
+mypy deadstick
+```
+
+Optional: install [pre-commit](https://pre-commit.com/) and run `pre-commit install` to use `.pre-commit-config.yaml` (Ruff) before you commit.
+
 ## Issues and pull requests
 
 Use GitHub issues for bugs and feature ideas. Pull requests should be small and focused.
