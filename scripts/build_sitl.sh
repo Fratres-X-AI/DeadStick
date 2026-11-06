@@ -35,10 +35,25 @@ echo "effective_cpus=$NPROC waf_jobs=$JOBS (cgroup-first)" | tee -a "${ROOT}/sit
 ./waf copter -j "$JOBS"
 
 COMMIT="$(git rev-parse HEAD)"
+
+META_DIR="${ROOT}/metadata"
+mkdir -p "$META_DIR"
+(
+  cd "$AP_DIR"
+  python3 Tools/autotest/param_metadata/param_parse.py --vehicle=Copter --format=json --no-legacy-params
+)
+cp -f "${AP_DIR}/apm.pdef.json" "${META_DIR}/apm.pdef.raw.json"
+OUT_META="${META_DIR}/Copter-${TAG}.json"
+python3 "${ROOT}/scripts/normalize_apm_pdef.py" "${META_DIR}/apm.pdef.raw.json" "$OUT_META"
+META_HASH="$(sha256sum "$OUT_META" | awk '{print $1}')"
+
 {
   echo "tag=$TAG"
   echo "commit=$COMMIT"
   echo "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo "metadata_json=$OUT_META"
+  echo "metadata_sha256=$META_HASH"
 } > "$LOCK"
 
 echo "Wrote $LOCK; binary: ${AP_DIR}/build/sitl/bin/arducopter"
+echo "Metadata: $OUT_META"

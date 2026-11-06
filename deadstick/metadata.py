@@ -9,7 +9,11 @@ def load_metadata(path: Path) -> dict[str, Any]:
     raw = json.loads(path.read_text(encoding="utf-8"))
     if raw.get("fake") is True:
         return raw
-    return raw
+    if "parameters" in raw:
+        return raw
+    from deadstick.metadata_norm import normalize_apm_pdef
+
+    return normalize_apm_pdef(raw)
 
 
 def assert_not_fake_metadata(path: Path, data: dict[str, Any]) -> None:
