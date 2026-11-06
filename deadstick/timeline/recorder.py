@@ -33,8 +33,8 @@ def record_mavlink_to_jsonl(
 
     events: list[TimelineEvent] = []
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    mode = "a" if append else "w"
-    f = out_path.open(mode, encoding="utf-8")
+    file_mode = "a" if append else "w"
+    f = out_path.open(file_mode, encoding="utf-8")
     t_end = time.monotonic() + duration_s
     last_mode: str | None = None
     try:
@@ -49,12 +49,23 @@ def record_mavlink_to_jsonl(
             t_ms = float(t)
             name = m.get_type()
             if name == "HEARTBEAT":
-                mode = _mode_name(mav, m)
-                if mode != last_mode:
-                    last_mode = mode
-                    ev = TimelineEvent(t_boot_ms=t_ms, type="mode", payload={"name": mode})
+                current_mode = _mode_name(mav, m)
+                if current_mode != last_mode:
+                    last_mode = current_mode
+                    ev = TimelineEvent(
+                        t_boot_ms=t_ms, type="mode", payload={"name": current_mode}
+                    )
                     events.append(ev)
-                    f.write(json.dumps({"t_boot_ms": t_ms, "type": "mode", "payload": {"name": mode}}) + "\n")
+                    f.write(
+                        json.dumps(
+                            {
+                                "t_boot_ms": t_ms,
+                                "type": "mode",
+                                "payload": {"name": current_mode},
+                            }
+                        )
+                        + "\n"
+                    )
             elif name == "STATUSTEXT":
                 text = getattr(m, "text", b"")
                 if isinstance(text, bytes):
@@ -87,6 +98,24 @@ def record_mavlink_to_jsonl(
     finally:
         f.close()
     return Timeline(events)
+
+
+def poll_mavlink_to_timeline(
+    mav: mavutil.mavlink_connection,
+    *,
+    out_path: Path,
+    duration_s: float,
+    poll_hz: float = 50.0,
+    append: bool = False,
+) -> Timeline:
+    """Alias for :func:`record_mavlink_to_jsonl` (scenario steps use this name)."""
+    return record_mavlink_to_jsonl(
+        mav,
+        out_path=out_path,
+        duration_s=duration_s,
+        poll_hz=poll_hz,
+        append=append,
+    )
 
 
 def append_events(path: Path, events: Iterable[TimelineEvent]) -> None:

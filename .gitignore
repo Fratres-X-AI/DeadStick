@@ -9,4 +9,6 @@ metadata/*.json
 metadata/apm.pdef.raw.json
 *.BIN
 *.bin
+!metadata/Copter-*.json
+!tests/fixtures/dataflash/*.BIN
 *.tlog

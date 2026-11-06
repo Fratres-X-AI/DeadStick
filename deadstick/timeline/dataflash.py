@@ -2,60 +2,71 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
+
 from deadstick.timeline.model import Timeline, TimelineEvent
 
 log = logging.getLogger(__name__)
 
 
 def timeus_to_ms(timeus: float) -> float:
-    """Dataflash TimeUS is microseconds; timeline uses milliseconds."""
+    """Dataflash TimeUS is microseconds; timeline uses milliseconds since boot."""
     return timeus / 1000.0
 
 
-def bin_to_timeline(path: Path) -> Timeline:
+def acm_mode_num_to_name(num: float | int) -> tuple[str, int]:
+    """Map ArduCopter custom_mode number to mode name using pymavlink's ACM table."""
+    from pymavlink import mavutil
+
+    n = int(num)
+    mm = mavutil.mode_mapping_acm
+    if callable(mm):
+        mm = mm()
+    # pymavlink exposes number → name (e.g. 6 → "RTL")
+    name = str(mm.get(n, f"UNKNOWN_{n}"))
+    return name, n
+
+
+def bin_to_timeline(path: Path, *, params: dict[str, float] | None = None) -> Timeline:
     """
     Convert an ArduPilot dataflash .BIN to Timeline events.
 
-    pymavlink's DFReader is pull-based; we walk messages and map a small set
-    of types used by checks (MODE, MSG, EV, CTUN, ERR).
+    Uses TimeUS / 1000 as t_boot_ms (time since boot). Does not use pymavlink's
+    wall-clock _timestamp — it is not comparable to live-link time_boot_ms.
+
+    Emits fault_injected from PARM rows: SIM_RC_FAIL != 0 (rc_loss), and
+    SIM_BATT_VOLTAGE when below BATT_LOW_VOLT from params (default heuristic if absent).
     """
     from pymavlink import mavutil
 
     reader = mavutil.mavlink_connection(str(path))
 
     events: list[TimelineEvent] = []
-    t0_ms: float | None = None
-    types = ("MODE", "MSG", "EV", "ERR", "CTUN")
+    batt_low_v = float(params.get("BATT_LOW_VOLT", 10.5)) if params else 10.5
+
+    types = ("MODE", "MSG", "EV", "ERR", "CTUN", "PARM")
     while True:
         m = reader.recv_match(type=list(types), blocking=False)
         if m is None:
             break
         name = m.get_type()
-        t_ms: float | None = None
-        if hasattr(m, "_timestamp") and m._timestamp is not None:
-            t_abs_ms = float(m._timestamp) * 1000.0
-        elif hasattr(m, "TimeUS") and m.TimeUS is not None:
-            t_abs_ms = timeus_to_ms(float(m.TimeUS))
-        elif hasattr(m, "time_boot_ms") and m.time_boot_ms is not None:
-            t_ms = float(m.time_boot_ms)
-            t_abs_ms = None
-        else:
-            t_abs_ms = None
 
-        if t_ms is None and t_abs_ms is not None:
-            if t0_ms is None:
-                t0_ms = t_abs_ms
-            t_ms = t_abs_ms - t0_ms
-
-        if t_ms is None:
+        if not hasattr(m, "TimeUS") or m.TimeUS is None:
             continue
+        t_ms = timeus_to_ms(float(m.TimeUS))
 
         if name == "MODE":
+            raw_num = getattr(m, "ModeNum", None)
+            if raw_num is None:
+                raw_num = getattr(m, "Mode", None)
+            if raw_num is None:
+                continue
+            mode_name, num = acm_mode_num_to_name(raw_num)
             events.append(
                 TimelineEvent(
                     t_boot_ms=t_ms,
                     type="mode",
-                    payload={"name": getattr(m, "Mode", None) or getattr(m, "mode", "")},
+                    payload={"name": mode_name, "num": num},
                 )
             )
         elif name == "MSG":
@@ -98,6 +109,35 @@ def bin_to_timeline(path: Path) -> Timeline:
                     },
                 )
             )
+        elif name == "PARM":
+            pname = str(getattr(m, "Name", "") or "").strip()
+            try:
+                val = float(getattr(m, "Value", 0.0))
+            except (TypeError, ValueError):
+                val = 0.0
+            events.append(
+                TimelineEvent(
+                    t_boot_ms=t_ms,
+                    type="parm",
+                    payload={"name": pname, "value": val},
+                )
+            )
+            if pname == "SIM_RC_FAIL" and val != 0.0:
+                events.append(
+                    TimelineEvent(
+                        t_boot_ms=t_ms,
+                        type="fault_injected",
+                        payload={"kind": "rc_loss", "source": "PARM_SIM_RC_FAIL"},
+                    )
+                )
+            elif pname == "SIM_BATT_VOLTAGE" and val > 0.0 and val < batt_low_v:
+                events.append(
+                    TimelineEvent(
+                        t_boot_ms=t_ms,
+                        type="fault_injected",
+                        payload={"kind": "battery_low", "source": "PARM_SIM_BATT_VOLTAGE"},
+                    )
+                )
 
     if not events:
         log.warning("No messages parsed from %s — empty or unsupported format", path)

@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
-
-from pymavlink import mavutil
 
 from deadstick.rules.schema import RuleFile
 from deadstick.timeline.model import TimelineEvent
 from deadstick.timeline.recorder import append_events, record_mavlink_to_jsonl
 from deadstick.sim.faults import FaultInjector
-from deadstick.sim.link import apply_param_file, connect, fetch_all_params, wait_heartbeat
+from deadstick.sim.link import apply_param_file, connect, wait_heartbeat
 
 
 @dataclass
@@ -48,23 +47,26 @@ def run_rule_scenario_stub(
     """
     from deadstick.sim.sitl import SitlProcess
 
-    run_id = f"{rule.id}_stub"
+    run_id = f"{rule.id}_{int(time.time())}_{uuid.uuid4().hex[:8]}"
     sitl_dir = results_dir / run_id / "sitl"
     timeline_path = results_dir / run_id / "timeline.jsonl"
     sitl_dir.mkdir(parents=True, exist_ok=True)
     if timeline_path.exists():
         timeline_path.unlink()
 
+    tcp_port = 5760
     sitl = SitlProcess(
         arducopter_bin=arducopter_bin,
         workdir=sitl_dir,
         speedup=speedup,
+        tcp_port=tcp_port,
+        instance=0,
         defaults_parm=defaults_parm,
     )
     inj = _find_inject_step(rule)
     try:
         sitl.start()
-        mav = connect()
+        mav = connect(f"tcp:127.0.0.1:{tcp_port}")
         wait_heartbeat(mav)
         reported, missing, rejected = apply_param_file(mav, param_path)
         fi = FaultInjector(mav)

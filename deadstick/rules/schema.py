@@ -53,7 +53,6 @@ class ScenarioStep(BaseModel):
 class ConfirmFaultAnyOf(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    log_err: dict[str, Any] | None = None
     statustext: str | None = None
 
 
@@ -69,6 +68,14 @@ class ExpectCheck(BaseModel):
 
     check: str
     payload: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def forbid_anchor_ms(self) -> ExpectCheck:
+        if "anchor_ms" in self.payload:
+            raise ValueError(
+                'expect blocks must not use "anchor_ms"; anchoring comes from fault_injected / PARM only'
+            )
+        return self
 
     @model_validator(mode="before")
     @classmethod

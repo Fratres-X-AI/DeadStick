@@ -15,14 +15,14 @@ from deadstick.timeline.model import Timeline
 from deadstick.verdict import Result, Verdict
 
 
-def _timeline_from_log(log: Path) -> Timeline:
+def _timeline_from_log(log: Path, params: dict[str, float]) -> Timeline:
     suf = log.suffix.lower()
     if suf == ".jsonl":
         return load_jsonl(log)
     if suf == ".bin":
         from deadstick.timeline.dataflash import bin_to_timeline
 
-        return bin_to_timeline(log)
+        return bin_to_timeline(log, params=params)
     raise ValueError(f"Unsupported log type {log.suffix!r} (use .jsonl or .bin)")
 
 
@@ -58,7 +58,7 @@ def evaluate_rule(
             results.append(pre)
             return results
 
-    fault_ms = infer_fault_inject_time(timeline)
+    fault_ms = infer_fault_inject_time(timeline, rule=rule)
     gate = evaluate_fault_gate(
         rule_id=rule.id,
         spec=rule.confirm_fault,
@@ -84,6 +84,7 @@ def evaluate_rule(
             r = fn(
                 rule_id=rule.id,
                 kind=rule.kind,
+                rule=rule,
                 timeline=timeline,
                 metadata=metadata,
                 params=params,
@@ -113,5 +114,5 @@ def run_from_paths(
     params = load_param_file(param_path)
     meta = load_metadata(metadata_path)
     assert_not_fake_metadata(metadata_path, meta)
-    timeline = _timeline_from_log(log_path)
+    timeline = _timeline_from_log(log_path, params)
     return evaluate_rule(rule=rule, params=params, metadata=meta, timeline=timeline)

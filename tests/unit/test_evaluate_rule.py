@@ -41,7 +41,7 @@ def _radio_confirm(t: float) -> str:
 def test_r02_pass_rc_loss_rtl(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
     params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
+        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n")
     )
     tl = load_jsonl(
         _write_jsonl(
@@ -63,7 +63,7 @@ def test_r02_pass_rc_loss_rtl(tmp_path: Path, repo_root: Path) -> None:
 def test_r02_fail_no_rtl(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
     params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
+        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n")
     )
     tl = load_jsonl(
         _write_jsonl(
@@ -82,7 +82,7 @@ def test_r02_fail_no_rtl(tmp_path: Path, repo_root: Path) -> None:
 def test_r02_fail_too_slow_mode(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
     params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
+        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n")
     )
     tl = load_jsonl(
         _write_jsonl(
@@ -102,7 +102,7 @@ def test_r02_fail_too_slow_mode(tmp_path: Path, repo_root: Path) -> None:
 def test_r02_unconfirmed_fault(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
     params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
+        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n")
     )
     tl = load_jsonl(
         _write_jsonl(
@@ -122,7 +122,7 @@ def test_r02_unconfirmed_fault(tmp_path: Path, repo_root: Path) -> None:
 def test_r02_missing_fault_event(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
     params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
+        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n")
     )
     tl = load_jsonl(
         _write_jsonl(
@@ -140,7 +140,7 @@ def test_r02_missing_fault_event(tmp_path: Path, repo_root: Path) -> None:
 def test_r02_precondition_fs_off(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r02_rc_loss_rtl_when_configured.yaml")
     params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,0\nFS_OPTIONS,0\n")
+        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,0\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n")
     )
     tl = load_jsonl(
         _write_jsonl(
@@ -162,7 +162,7 @@ def test_r02_precondition_fs_off(tmp_path: Path, repo_root: Path) -> None:
 def test_r01_pass_arming_refused(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r01_rc_loss_disarmed_blocks_arming.yaml")
     params = load_param_file(
-        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\n")
+        _write_param(tmp_path / "p.param", "FS_THR_ENABLE,1\nFS_OPTIONS,0\nRC_FS_TIMEOUT,2\n")
     )
     tl = load_jsonl(
         _write_jsonl(
@@ -180,7 +180,9 @@ def test_r01_pass_arming_refused(tmp_path: Path, repo_root: Path) -> None:
 
 def test_r03_battery_land(tmp_path: Path, repo_root: Path) -> None:
     rule = load_rule(repo_root / "rules" / "copter" / "r03_battery_low_triggers_land.yaml")
-    params = load_param_file(_write_param(tmp_path / "p.param", "BATT_FS_LOW_ACT,1\n"))
+    params = load_param_file(
+        _write_param(tmp_path / "p.param", "BATT_FS_LOW_ACT,1\nBATT_LOW_TIMER,2\n")
+    )
     tl = load_jsonl(
         _write_jsonl(
             tmp_path / "t.jsonl",

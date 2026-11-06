@@ -20,5 +20,11 @@ MIN_COPTER_METADATA: dict[str, Any] = {
         "BATT_FS_LOW_ACT": {
             "values": {"0": "None", "1": "Land", "2": "RTL"},
         },
+        "RC_FS_TIMEOUT": {
+            "values": {"0": "Disabled"},
+        },
+        "BATT_LOW_TIMER": {
+            "values": {"0": "Immediate"},
+        },
     },
 }

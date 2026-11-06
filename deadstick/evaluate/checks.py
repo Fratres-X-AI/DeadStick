@@ -9,7 +9,7 @@ from deadstick.evaluate.expectations import (
     rc_loss_action_modes,
     within_s_from_expr,
 )
-from deadstick.rules.schema import RuleKind
+from deadstick.rules.schema import RuleFile, RuleKind
 from deadstick.timeline.model import Timeline
 from deadstick.verdict import Result, Verdict
 
@@ -43,18 +43,17 @@ def _resolve_modes(payload: dict[str, Any], metadata: dict, params: dict[str, fl
     return None, f"Unknown modes_from {modes_from!r}"
 
 
-def _anchor_ms(payload: dict[str, Any], timeline: Timeline) -> float | None:
-    if "anchor_ms" in payload:
-        return float(payload["anchor_ms"])
+def _anchor_ms(payload: dict[str, Any], timeline: Timeline, rule: RuleFile) -> float | None:
     from deadstick.evaluate.confirmation import infer_fault_inject_time
 
-    return infer_fault_inject_time(timeline)
+    return infer_fault_inject_time(timeline, rule=rule)
 
 
 def check_expect_mode_within(
     *,
     rule_id: str,
     kind: RuleKind,
+    rule: RuleFile,
     timeline: Timeline,
     metadata: dict,
     params: dict[str, float],
@@ -64,12 +63,12 @@ def check_expect_mode_within(
     if err:
         return Result(rule_id=rule_id, verdict=Verdict.CANNOT_JUDGE, reason=err)
     assert modes is not None
-    anchor_ms = _anchor_ms(payload, timeline)
+    anchor_ms = _anchor_ms(payload, timeline, rule)
     if anchor_ms is None:
         return Result(
             rule_id=rule_id,
             verdict=Verdict.CANNOT_JUDGE,
-            reason="expect_mode_within needs anchor_ms or fault_injected in timeline.",
+            reason="expect_mode_within needs fault_injected in timeline.",
         )
     try:
         within_s = _resolve_within_s(payload, params)
@@ -80,6 +79,12 @@ def check_expect_mode_within(
         if e.type != "mode":
             continue
         name = str(e.payload.get("name", "")).strip().upper()
+        if name.startswith("UNKNOWN_"):
+            return Result(
+                rule_id=rule_id,
+                verdict=Verdict.CANNOT_JUDGE,
+                reason=f"Mode {name!r} is not mapped from dataflash; cannot judge.",
+            )
         if any(name == m.strip().upper() for m in modes):
             return Result(
                 rule_id=rule_id,
@@ -99,6 +104,7 @@ def check_expect_no_mode_change(
     *,
     rule_id: str,
     kind: RuleKind,
+    rule: RuleFile,
     timeline: Timeline,
     metadata: dict,  # noqa: ARG001
     params: dict[str, float],  # noqa: ARG001
@@ -144,6 +150,7 @@ def check_expect_alt_at_least(
     *,
     rule_id: str,
     kind: RuleKind,
+    rule: RuleFile,
     timeline: Timeline,
     metadata: dict,  # noqa: ARG001
     params: dict[str, float],
@@ -179,17 +186,18 @@ def check_expect_statustext(
     *,
     rule_id: str,
     kind: RuleKind,
+    rule: RuleFile,
     timeline: Timeline,
     metadata: dict,  # noqa: ARG001
     params: dict[str, float],
     payload: dict[str, Any],
 ) -> Result:
-    anchor_ms = _anchor_ms(payload, timeline)
+    anchor_ms = _anchor_ms(payload, timeline, rule)
     if anchor_ms is None:
         return Result(
             rule_id=rule_id,
             verdict=Verdict.CANNOT_JUDGE,
-            reason="expect_statustext needs anchor_ms or fault_injected in timeline.",
+            reason="expect_statustext needs fault_injected in timeline.",
         )
     try:
         within_s = _resolve_within_s(payload, params)
@@ -220,17 +228,18 @@ def check_expect_arming_refused(
     *,
     rule_id: str,
     kind: RuleKind,
+    rule: RuleFile,
     timeline: Timeline,
     metadata: dict,  # noqa: ARG001
     params: dict[str, float],
     payload: dict[str, Any],
 ) -> Result:
-    anchor_ms = _anchor_ms(payload, timeline)
+    anchor_ms = _anchor_ms(payload, timeline, rule)
     if anchor_ms is None:
         return Result(
             rule_id=rule_id,
             verdict=Verdict.CANNOT_JUDGE,
-            reason="expect_arming_refused needs anchor_ms or fault_injected in timeline.",
+            reason="expect_arming_refused needs fault_injected in timeline.",
         )
     try:
         within_s = _resolve_within_s(payload, params)

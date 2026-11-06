@@ -105,13 +105,13 @@ def run_cmd(
 
     timeline_jsonl = load_jsonl(log) if log.suffix.lower() == ".jsonl" else None
     if dataflash is not None:
-        timeline = bin_to_timeline(dataflash)
+        timeline = bin_to_timeline(dataflash, params=param_map)
         primary_log = dataflash
     elif timeline_jsonl is not None:
         timeline = timeline_jsonl
         primary_log = log
     else:
-        timeline = bin_to_timeline(log)
+        timeline = bin_to_timeline(log, params=param_map)
         primary_log = log
 
     prov = build_provenance(
@@ -159,6 +159,83 @@ def run_cmd(
         raise typer.Exit(code=1)
 
 
+@app.command("sitl-run")
+def sitl_run(
+    rule: Path = typer.Option(..., "--rule", "-r"),
+    params: Path = typer.Option(..., "--params", "-p"),
+    metadata: Path = typer.Option(..., "--metadata", "-m"),
+    arducopter: Path = typer.Option(
+        ...,
+        "--arducopter",
+        help="Path to arducopter SITL binary (after ./waf copter on the pod).",
+    ),
+    results_dir: Path = typer.Option(
+        Path("results"),
+        "--results-dir",
+        "-o",
+        help="Directory for sitl_<uuid>/ run folders.",
+    ),
+    defaults: Optional[Path] = typer.Option(
+        None,
+        "--defaults",
+        help="Optional --defaults .parm for SITL.",
+    ),
+    speedup: float = typer.Option(1.0, "--speedup"),
+    tcp_base: int = typer.Option(5760, "--tcp-base", help="SERIAL0 base port (5760 + instance*10)."),
+    instance: int = typer.Option(0, "--instance", "-I", help="SITL instance index."),
+    observe_after_inject_s: float = typer.Option(
+        45.0,
+        "--observe-after-inject-s",
+        help="MAVLink poll window after inject (in-air rules).",
+    ),
+    allow_fake: bool = typer.Option(False, "--allow-fake-metadata"),
+    seed: Optional[int] = typer.Option(None, "--seed"),
+) -> None:
+    """Run one rule against live SITL on this machine (Linux/RunPod)."""
+    from deadstick.metadata import assert_not_fake_metadata
+    from deadstick.sim.scenario_engine import run_rule_on_sitl
+
+    meta = load_metadata(metadata)
+    if not allow_fake:
+        try:
+            assert_not_fake_metadata(metadata, meta)
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(code=2) from exc
+
+    out = run_rule_on_sitl(
+        rule_path=rule,
+        param_path=params,
+        metadata_path=metadata,
+        arducopter_bin=arducopter,
+        defaults_parm=defaults,
+        results_dir=results_dir,
+        speedup=speedup,
+        tcp_base_port=tcp_base,
+        instance=instance,
+        observe_after_inject_s=observe_after_inject_s,
+        allow_fake_metadata=allow_fake,
+        seed=seed,
+    )
+    table = Table(title=f"SITL results for {out.results[0].rule_id if out.results else '?'}")
+    table.add_column("verdict")
+    table.add_column("reason")
+    for res in out.results:
+        color = {
+            Verdict.PASS: "green",
+            Verdict.FAIL: "red",
+            Verdict.CANNOT_JUDGE: "yellow",
+            Verdict.ERROR: "magenta",
+        }.get(res.verdict, "white")
+        table.add_row(f"[{color}]{res.verdict.value}[/{color}]", res.reason)
+    console.print(table)
+    if out.harness_error:
+        console.print(f"[yellow]Harness stderr note:[/yellow] {out.harness_error}")
+    console.print(f"[dim]Run dir:[/dim] {out.run_dir}")
+    if out.verdict in (Verdict.FAIL, Verdict.ERROR):
+        raise typer.Exit(code=1)
+
+
 @app.command("run-all")
 def run_all(
     rules_dir: Path = typer.Option(Path("rules/copter"), "--rules-dir"),
@@ -184,11 +261,11 @@ def run_all(
 
             assert_not_fake_metadata(metadata, meta)
         if dataflash is not None:
-            timeline = bin_to_timeline(dataflash)
+            timeline = bin_to_timeline(dataflash, params=param_map)
         elif log.suffix.lower() == ".jsonl":
             timeline = load_jsonl(log)
         else:
-            timeline = bin_to_timeline(log)
+            timeline = bin_to_timeline(log, params=param_map)
         prov = build_provenance(param_path=params, rule_path=rule_path, extra={"batch": run_id})
         rows = evaluate_rule(rule=rf, params=param_map, metadata=meta, timeline=timeline)
         w = _aggregate_worst(rows)

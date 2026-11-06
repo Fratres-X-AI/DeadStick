@@ -6,19 +6,18 @@ kind: requirement
 vehicle: copter
 requires_params:
   - BATT_FS_LOW_ACT
+  - BATT_LOW_TIMER
 precondition:
   expr: BATT_FS_LOW_ACT != 0
   reason_if_not: Battery low action disabled — requirement not applicable.
 scenario:
   - inject_fault:
       kind: battery_low
-      at_ms: 3000
 confirm_fault:
   any_of:
     - statustext: "(?i)battery.*failsafe|batt.*fs|low.*battery"
   within_s: 5
 expect:
   - check: expect_mode_within
-    anchor_ms: 3000
-    within_s: 45
+    within_s_expr: "BATT_LOW_TIMER + 1.0"
     modes_from: expectations.batt_low_action

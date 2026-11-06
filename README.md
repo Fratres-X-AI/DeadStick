@@ -28,7 +28,18 @@ deadstick --help
 | `deadstick explain rules/copter/r01_….yaml` | Rule summary; **no** simulator. |
 | `deadstick run -r RULE -p PARAMS -m METADATA -l TIMELINE.jsonl [--dataflash X.BIN]` | Evaluate; refuses `FAKE_*` metadata / `"fake": true` unless `--allow-fake-metadata`. Verdict from **`.BIN`** when `--dataflash` is set (vehicle record). |
 | `deadstick run-all --rules-dir rules/copter -p … -m … -l …` | All rules in folder, sequential. |
+| `deadstick sitl-run …` | Live SITL on Linux/RunPod (see `--help`); writes `results/sitl_<id>/`. |
 | `deadstick report results/.../result.json` | Short summary. |
+
+## Pre–phase-3 correctness (SITL / dataflash)
+
+- **MAVLink to SITL** uses `tcp:` (bare `host:port` in pymavlink is UDP). Default in `deadstick.sim.link.connect` is `tcp:127.0.0.1:5760`.
+- **`.BIN` time base** uses `TimeUS / 1000` as milliseconds since boot (not pymavlink’s wall-clock `_timestamp`).
+- **MODE** rows from dataflash map numeric mode via `mavutil.mode_mapping_acm`; unknown numbers → `UNKNOWN_n` and mode checks return **CANNOT_JUDGE**, not false FAIL.
+- **Fault time for `.BIN`** comes from `PARM` lines (`SIM_RC_FAIL`, `SIM_BATT_VOLTAGE` below `BATT_LOW_VOLT`) as synthetic `fault_injected` events; pass the same `.param` values into `deadstick run` so thresholds match.
+- **Rules** no longer use `anchor_ms`; expectation windows anchor on `fault_injected` (or schema error if `anchor_ms` appears).
+- **`LOG_DISARMED`** is applied before reboot in `sitl-run` so disarmed rules still get logs.
+- **`scripts/pod_pulse.sh`**: optional pod heartbeat loop (e.g. `bash scripts/pod_pulse.sh 20 120` for 20 check-ins, 120s apart).
 
 ## How to read a `FAIL`
 

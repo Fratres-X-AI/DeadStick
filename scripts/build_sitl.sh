@@ -15,7 +15,7 @@ fi
 
 cd "$AP_DIR"
 git fetch --tags --force
-TAG="$(git tag -l 'Copter-4.7.*' | sort -V | tail -1)"
+TAG="$(git tag -l 'Copter-4.7.*' | grep -Ev 'beta|rc' | sort -V | tail -1)"
 if [ -z "$TAG" ]; then
   echo "No Copter-4.7.* tag found"
   exit 1
@@ -24,7 +24,7 @@ git checkout "$TAG"
 git submodule update --init --recursive
 
 if [ -f Tools/environment_install/install-prereqs-ubuntu.sh ]; then
-  bash Tools/environment_install/install-prereqs-ubuntu.sh -y || true
+  bash Tools/environment_install/install-prereqs-ubuntu.sh -y
 fi
 
 ./waf configure --board sitl
@@ -40,7 +40,11 @@ META_DIR="${ROOT}/metadata"
 mkdir -p "$META_DIR"
 (
   cd "$AP_DIR"
-  python3 Tools/autotest/param_metadata/param_parse.py --vehicle=Copter --format=json --no-legacy-params
+  if python3 Tools/autotest/param_metadata/param_parse.py --help 2>&1 | grep -q no-legacy-params; then
+    python3 Tools/autotest/param_metadata/param_parse.py --vehicle=Copter --format=json --no-legacy-params
+  else
+    python3 Tools/autotest/param_metadata/param_parse.py --vehicle=Copter --format=json
+  fi
 )
 cp -f "${AP_DIR}/apm.pdef.json" "${META_DIR}/apm.pdef.raw.json"
 OUT_META="${META_DIR}/Copter-${TAG}.json"

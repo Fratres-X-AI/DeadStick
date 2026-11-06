@@ -32,18 +32,26 @@ class SitlProcess:
         model: str = "quad",
         speedup: float = 1.0,
         tcp_port: int = 5760,
+        instance: int = 0,
         defaults_parm: Path | None = None,
+        home: str = "-35.363261,149.165230,584,353",
     ) -> None:
         self.arducopter_bin = arducopter_bin
         self.workdir = workdir
         self.model = model
         self.speedup = speedup
         self.tcp_port = tcp_port
+        self.instance = int(instance)
         self.defaults_parm = defaults_parm
+        self.home = home
         self._proc: subprocess.Popen[str] | None = None
+        self._log_f: IO[str] | None = None
 
     def start(self) -> None:
         self.workdir.mkdir(parents=True, exist_ok=True)
+        log_path = self.workdir / "sitl.log"
+        self._log_f = log_path.open("w", encoding="utf-8")
+        log_f = self._log_f
         for stale in ("eeprom.bin", "terrain"):
             p = self.workdir / stale
             if p.is_file():
@@ -55,19 +63,19 @@ class SitlProcess:
             "--model",
             self.model,
             "--home",
-            "0,0,0,0",
-            "-I0",
+            self.home,
+            f"-I{self.instance}",
             "--speedup",
             str(self.speedup),
         ]
         if self.defaults_parm is not None:
             cmd.extend(["--defaults", str(self.defaults_parm)])
-        # SITL listens on tcp:5760 (+instance offset) for instance 0
+        # SITL SERIAL0 is tcp:5760 + instance*10 (see ArduPilot SITL).
         self._proc = subprocess.Popen(
             cmd,
             cwd=str(self.workdir),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_f,
+            stderr=subprocess.STDOUT,
             text=True,
         )
         wait_tcp_open("127.0.0.1", self.tcp_port, timeout_s=90.0)
@@ -81,3 +89,9 @@ class SitlProcess:
         except subprocess.TimeoutExpired:
             self._proc.kill()
         self._proc = None
+        if self._log_f is not None:
+            try:
+                self._log_f.close()
+            except Exception:
+                pass
+            self._log_f = None
